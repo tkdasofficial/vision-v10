@@ -20,7 +20,7 @@ function memDb() {
     if (s.startsWith("SELECT * FROM generation_jobs WHERE id")) { const j = jobs.get(p[0] as string); return j && j.user_id === p[1] ? [j] : []; }
     if (s.startsWith("INSERT OR IGNORE INTO generation_jobs")) {
       if (jobs.has(p[0] as string)) return [];
-      jobs.set(p[0] as string, { id: p[0], user_id: p[1], instructions: p[2], model_config: p[3], settings: p[4], status: p[5], total_chunks: 0, completed_chunks: 0, error: null, created_at: p[6], updated_at: p[7] });
+      jobs.set(p[0] as string, { id: p[0], user_id: p[1], instructions: p[2], model_config: p[3], settings: p[4], status: "pending", total_chunks: 0, completed_chunks: 0, error: null, created_at: p[5], updated_at: p[6] });
       return [];
     }
     if (s.startsWith("UPDATE generation_jobs SET status")) {
@@ -51,10 +51,10 @@ function memDb() {
     if (s.startsWith("INSERT INTO generation_context")) return [];
     if (s.startsWith("SELECT p.* FROM generation_plans")) { const pl = plans.filter((x) => x.job_id === p[0] && x.status === "active").pop(); return pl && jobs.get(p[0] as string)?.user_id === p[1] ? [pl] : []; }
     if (s.startsWith("SELECT c.* FROM generation_chunks")) return [...chunks.values()].filter((c) => c.job_id === p[0] && jobs.get(p[0] as string)?.user_id === p[1]).sort((a, b) => a.seq - b.seq);
-    if (s.startsWith("UPDATE generation_chunks SET status = CASE")) {
+    if (s.startsWith("UPDATE generation_chunks SET status = 'generating'")) {
       const c = chunks.get(`${p[1]}:${p[2]}`);
       if (!c || !["pending", "failed", "retrying"].includes(c.status)) return [];
-      c.status = c.status === "retrying" ? "retrying" : "generating"; c.attempts++; c.updated_at = now;
+      c.status = "generating"; c.attempts++; c.updated_at = now;
       return [c];
     }
     if (s.startsWith("UPDATE generation_chunks SET content")) {
@@ -75,7 +75,7 @@ function memDb() {
       return [{ id: c.id }];
     }
     if (s.startsWith("UPDATE generation_chunks SET status = 'retrying'")) {
-      [...chunks.values()].forEach((c) => { if (c.job_id === p[1] && ["failed", "generating", "validating"].includes(c.status)) c.status = "retrying"; });
+      [...chunks.values()].forEach((c) => { if (c.job_id === p[1] && (p.length === 4 ? c.seq === p[3] && c.status === "failed" : ["failed", "generating", "validating"].includes(c.status))) c.status = "retrying"; });
       return [];
     }
     if (s.startsWith("INSERT INTO generation_outputs")) { outputs.push({ job_id: p[0], version: p[1], content: p[2], validation_status: p[3], validation_detail: p[4] }); return []; }
@@ -112,6 +112,9 @@ describe("generation plan", () => {
       { seq: 1, sectionId: "b", title: "b", instructions: "", dependsOn: [0], tokenBudget: 1 },
     ];
     expect(() => scheduleWaves(chunks)).toThrow(/cycle/);
+  });
+  it("rejects silent outline truncation", () => {
+    expect(() => buildPlan("Write every section", ["One", "Two", "Three"], { maxChunks: 2 })).toThrow("3 sections");
   });
 });
 
@@ -161,6 +164,11 @@ describe("assembly validation", () => {
   });
   it("assembles in sequence order", () => {
     expect(assemble([{ seq: 1, content: "b" }, { seq: 0, content: "a" }])).toBe("a\n\nb");
+  });
+  it("rejects missing trailing sections, empty output and corrupted saved content", () => {
+    expect(validateAssembly([c(0, "a")], 2).ok).toBe(false);
+    expect(validateAssembly([], 2).ok).toBe(false);
+    expect(validateAssembly([{ ...c(0, "original"), content: "corrupted" }], 1).ok).toBe(false);
   });
 });
 
@@ -266,5 +274,21 @@ describe("runner with mocked store and model", () => {
   it("rejects invalid assembly when a chunk is lost", () => {
     const bad = validateAssembly([{ seq: 0, status: "completed", content: "a", checksum: checksum("a") }, { seq: 2, status: "completed", content: "c", checksum: checksum("c") }]);
     expect(bad.ok).toBe(false);
+  });
+  it("records unexpected provider exceptions instead of leaving a running job", async () => {
+    const { db, jobs } = memDb();
+    const job = await store.createJob("u1", { instructions: "Write a long guide" }, db);
+    await expect(runJob("u1", job.id, { db, call: async () => { throw new Error("Provider connection closed"); } })).rejects.toThrow("Provider connection closed");
+    expect(jobs.get(job.id)).toMatchObject({ status: "failed", error: "Provider connection closed" });
+  });
+  it("allows only one claimant for a retrying chunk", async () => {
+    const { db } = memDb();
+    const job = await store.createJob("u1", { instructions: "Write" }, db);
+    await store.savePlan("u1", job.id, buildPlan("Write", ["One"]), db);
+    await store.claimChunk("u1", job.id, 0, db);
+    await store.failChunk("u1", job.id, 0, "invalid", db);
+    await store.markRetryable("u1", job.id, db);
+    expect(await store.claimChunk("u1", job.id, 0, db)).toMatchObject({ status: "generating" });
+    expect(await store.claimChunk("u1", job.id, 0, db)).toBeNull();
   });
 });

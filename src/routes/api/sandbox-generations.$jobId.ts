@@ -45,14 +45,14 @@ export const Route = createFileRoute("/api/sandbox-generations/$jobId")({
         const job = await store.getJob(caller.user.id, params.jobId);
         if (!job) return Response.json({ error: "Not found." }, { status: 404 });
         const runner = await import("@/lib/sandbox/runner.server");
-        const ctx = (globalThis as any).__visionWorkerCtx;
         if (action === "cancel") {
           const ok = await runner.cancelJob(caller.user.id, params.jobId);
           return Response.json({ ok });
         }
         if (action === "retry" || action === "resume") {
           const promise = runner.retryJob(caller.user.id, params.jobId).catch((e) => console.error("[sandbox] retry failed", (e as Error)?.message));
-          ctx?.waitUntil?.(promise);
+          const { keepAlive } = await import("@/lib/jobs/chat-background.server");
+          keepAlive(promise);
           return Response.json({ ok: true }, { status: 202 });
         }
         return Response.json({ error: "Unknown action." }, { status: 400 });

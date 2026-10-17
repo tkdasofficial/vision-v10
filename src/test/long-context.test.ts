@@ -23,7 +23,7 @@ function memDb() {
     if (s.startsWith("SELECT * FROM generation_jobs WHERE id")) { const j = jobs.get(p[0] as string); return j && j.user_id === p[1] ? [j] : []; }
     if (s.startsWith("INSERT OR IGNORE INTO generation_jobs")) {
       if (jobs.has(p[0] as string)) return [];
-      jobs.set(p[0] as string, { id: p[0], user_id: p[1], instructions: p[2], model_config: p[3], settings: p[4], status: p[5], total_chunks: 0, completed_chunks: 0, error: null, created_at: p[6], updated_at: p[7] });
+      jobs.set(p[0] as string, { id: p[0], user_id: p[1], instructions: p[2], model_config: p[3], settings: p[4], status: "pending", total_chunks: 0, completed_chunks: 0, error: null, created_at: p[5], updated_at: p[6] });
       return [];
     }
     if (s.startsWith("UPDATE generation_jobs SET status")) {
@@ -49,10 +49,10 @@ function memDb() {
     if (s.startsWith("INSERT INTO generation_context")) return [];
     if (s.startsWith("SELECT p.* FROM generation_plans")) { const pl = plans.filter((x) => x.job_id === p[0] && x.status === "active").pop(); return pl && jobs.get(p[0] as string)?.user_id === p[1] ? [pl] : []; }
     if (s.startsWith("SELECT c.* FROM generation_chunks")) return [...chunks.values()].filter((c) => c.job_id === p[0] && jobs.get(p[0] as string)?.user_id === p[1]).sort((a, b) => a.seq - b.seq);
-    if (s.startsWith("UPDATE generation_chunks SET status = CASE")) {
+    if (s.startsWith("UPDATE generation_chunks SET status = 'generating'")) {
       const c = chunks.get(`${p[1]}:${p[2]}`);
       if (!c || !["pending", "failed", "retrying"].includes(c.status)) return [];
-      c.status = c.status === "retrying" ? "retrying" : "generating"; c.attempts++; c.updated_at = now;
+      c.status = "generating"; c.attempts++; c.updated_at = now;
       return [c];
     }
     if (s.startsWith("UPDATE generation_chunks SET content")) {
@@ -69,7 +69,7 @@ function memDb() {
       return [{ id: c.id }];
     }
     if (s.startsWith("UPDATE generation_chunks SET status = 'retrying'")) {
-      [...chunks.values()].forEach((c) => { if (c.job_id === p[1] && ["failed", "generating", "validating"].includes(c.status)) c.status = "retrying"; });
+      [...chunks.values()].forEach((c) => { if (c.job_id === p[1] && (p.length === 4 ? c.seq === p[3] && c.status === "failed" : ["failed", "generating", "validating"].includes(c.status))) c.status = "retrying"; });
       return [];
     }
     if (s.startsWith("INSERT INTO generation_outputs")) { outputs.push({ job_id: p[0], version: p[1], content: p[2], validation_status: p[3], validation_detail: p[4] }); return []; }
@@ -221,8 +221,8 @@ describe("pipeline (mocked provider, in-memory sandbox)", () => {
     expect([...chunks.values()].every((c) => c.status === "completed" && c.content)).toBe(true);
     expect(outputs.at(-1).validation_status).toBe("valid");
     // Columns land in the required order.
-    expect(result.rows![0]).toHaveLength(CATALOG_COLUMNS.length);
-    expect(result.rows![0][0]).toBe("P-0001");
+    expect(result.rows?.[0]).toHaveLength(CATALOG_COLUMNS.length);
+    expect(result.rows?.[0][0]).toBe("P-0001");
   });
 
   it("resumes a failed job without regenerating completed chunks", async () => {
@@ -255,5 +255,45 @@ describe("pipeline (mocked provider, in-memory sandbox)", () => {
     const result = await runPipeline("u1", "retry-invalid", prompt, { db, call });
     expect(result.rows).toHaveLength(200);
     expect(seen.filter((s) => s === "1-50")).toHaveLength(1);
+  });
+  it("passes exact previous content to dependent sections", async () => {
+    const { db } = memDb();
+    const call = vi.fn(async (messages: unknown[]) => {
+      const user = String((messages[1] as { content: string }).content);
+      if (!user.includes("Your task:")) return { ok: true, text: '["Start", "Continue with the ending"]' };
+      if (user.includes('Write the section "Start"')) return { ok: true, text: "The key stays with Mira at the station." };
+      expect(user).toContain('Earlier section "Start" (full text)');
+      expect(user).toContain("The key stays with Mira at the station.");
+      return { ok: true, text: "Mira unlocks the station door with the same key." };
+    });
+    const result = await runPipeline("u1", "continuity", "Write a long two-part story", { db, call });
+    expect(result.text).toBe("The key stays with Mira at the station.\n\nMira unlocks the station door with the same key.");
+  });
+  it("persists thrown provider errors without blindly retrying", async () => {
+    const { db, jobs, chunks } = memDb();
+    const call = vi.fn(async () => { throw new Error("Provider connection closed"); });
+    await expect(runPipeline("u1", "thrown", "Generate Excel with 50 product records", { db, call })).rejects.toThrow("Provider connection closed");
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(jobs.get("thrown")).toMatchObject({ status: "failed", error: "Provider connection closed" });
+    expect([...chunks.values()][0]).toMatchObject({ status: "failed", error: "Provider connection closed" });
+  });
+  it("does not reset another active chunk during an invalid-record retry", async () => {
+    const { db, chunks } = memDb();
+    const good = fakeCall([]);
+    let invalid = true;
+    const call = async (messages: unknown[]) => {
+      if (JSON.stringify(messages).includes("Records 1-50:") && invalid) {
+        invalid = false;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return { ok: true, text: "invalid JSON" };
+      }
+      if (JSON.stringify(messages).includes("Records 51-100:")) {
+        await new Promise((resolve) => setTimeout(resolve, 15));
+        expect(chunks.get("isolated:1")?.status).toBe("generating");
+      }
+      return good(messages);
+    };
+    const result = await runPipeline("u1", "isolated", "Generate Excel with 100 product records", { db, call });
+    expect(result.rows).toHaveLength(100);
   });
 });

@@ -21,7 +21,9 @@ const defaultCall: Call = (messages, maxTokens) => callOrchestrator(messages, ma
 
 async function runLimited<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   let i = 0;
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => { while (i < items.length) await fn(items[i++]); }));
+  const results = await Promise.allSettled(Array.from({ length: Math.min(limit, items.length) }, async () => { while (i < items.length) await fn(items[i++]); }));
+  const failed = results.find((r) => r.status === "rejected");
+  if (failed?.status === "rejected") throw failed.reason;
 }
 
 export type PipelineResult = { sandboxJobId: string; chunks: number; rows?: unknown[][]; text?: string };
@@ -40,6 +42,7 @@ export async function runPipeline(userId: string, requestId: string, prompt: str
 
   const sjob = await store.createJob(userId, { instructions: prompt, settings: { format: excel ? "xlsx" : "md", rows: totalRows || undefined }, requestId }, db);
 
+  try {
   let plan = await store.loadPlan(userId, sjob.id, db);
   if (!plan) {
     await store.setJobStatus(userId, sjob.id, ["pending", "failed"], "planning", {}, db);
@@ -77,8 +80,14 @@ export async function runPipeline(userId: string, requestId: string, prompt: str
         if (!spec) throw new Error("Generation section is missing.");
         const messages = excel
           ? catalogChunkMessages(prompt, spec.title, batchFor(seq))
-          : gen.chunkMessages(gen.buildChunkContext({ instructions: prompt, outline: activePlan.outline, chunk: spec, completed: [], policy: activePlan.contextPolicy }), spec.tokenBudget);
-        const res = await call(messages, excel ? CATALOG_TOKENS : spec.tokenBudget);
+          : gen.chunkMessages(gen.buildChunkContext({ instructions: prompt, outline: activePlan.outline, chunk: spec, completed: chunks.flatMap((c: any) => c.status === "completed" && c.content ? [{ seq: c.seq, sectionId: c.section_id, title: activePlan.chunks[c.seq]?.title ?? c.section_id, content: String(c.content) }] : []), policy: activePlan.contextPolicy }), spec.tokenBudget);
+        let res: Awaited<ReturnType<Call>>;
+        try { res = await call(messages, excel ? CATALOG_TOKENS : spec.tokenBudget); }
+        catch (e) {
+          const { safeError } = await import("./jobs.server");
+          await store.failChunk(userId, sjob.id, seq, safeError(e), db);
+          throw e;
+        }
         const text = res.ok ? (res.text ?? "").trim() : "";
         let error = res.ok ? "Empty chunk" : (res.reason ?? "Generation failed");
         if (text) {
@@ -91,7 +100,7 @@ export async function runPipeline(userId: string, requestId: string, prompt: str
           } catch (e) { error = e instanceof Error ? e.message : "Invalid generated records"; }
         }
         await store.failChunk(userId, sjob.id, seq, error, db);
-        if (attempt < CHUNK_ATTEMPTS) await store.markRetryable(userId, sjob.id, db);
+        if (attempt < CHUNK_ATTEMPTS) await store.markRetryable(userId, sjob.id, db, seq);
       }
       const done = (await store.listChunks(userId, sjob.id, db)).filter((c: any) => c.status === "completed").length;
       await opts.onProgress?.(done, plan.chunks.length);
@@ -104,7 +113,7 @@ export async function runPipeline(userId: string, requestId: string, prompt: str
     await store.setJobStatus(userId, sjob.id, null, "failed", { error: `${missing.length} section(s) failed; retry to resume.` }, db);
     throw new Error(`${missing.length} of ${plan.chunks.length} sections could not be generated. Retry the task — finished sections are kept.`);
   }
-  const assembly = gen.validateAssembly(final);
+  const assembly = gen.validateAssembly(final, plan.chunks.length);
   if (!assembly.ok) {
     await store.saveOutput(userId, sjob.id, "", false, assembly.problems.join("; "), db);
     await store.setJobStatus(userId, sjob.id, null, "failed", { error: "Assembly validation failed" }, db);
@@ -127,6 +136,14 @@ export async function runPipeline(userId: string, requestId: string, prompt: str
   await store.saveOutput(userId, sjob.id, JSON.stringify({ rows: rows.length, columns: CATALOG_COLUMNS.length }), true, undefined, db);
   await store.setJobStatus(userId, sjob.id, ["generating", "assembling"], "completed", {}, db);
   return { sandboxJobId: sjob.id, chunks: plan.chunks.length, rows };
+  } catch (e) {
+    const { safeError } = await import("./jobs.server");
+    const error = safeError(e);
+    console.error("[long-context] failed", { jobId: sjob.id, error });
+    try { await store.setJobStatus(userId, sjob.id, ["pending", "planning", "generating", "validating", "assembling"], "failed", { error }, db); }
+    catch (persistError) { console.error("[long-context] failure state not saved", { jobId: sjob.id, error: safeError(persistError) }); }
+    throw e;
+  }
 }
 
 /** Stale recovery fails a job with no update for 3 minutes; long provider calls need heartbeats. */

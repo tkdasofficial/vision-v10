@@ -1,5 +1,12 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Uploaded long-output pipeline repair
+- [ ] Underlying interruption error unavailable: signed-in restored job fb85f20a stops at chunk_started, with sandbox generating/zero completed and no saved error. No blind Excel retry; requires server telemetry from the executing backend.
+- [x] Repaired dependency context, chunk retry isolation/atomic claiming, full-plan count/checksum validation, silent outline truncation, unexpected failure persistence, parallel settlement and sandbox background keeper wiring. Seven new regressions; full suite 1435 passed, 1 skipped; automatic build OK.
+- [x] Signed-in long-text request saved 1583 words; initial screen showed only first section, reload showed all eight sections. Removed duplicate legacy animation; fresh signed-in chat c29408d6 showed 1816 visible words and section eight without reload, no page errors. Final focused suite: 85 passed; automatic build OK.
+- [ ] Long file/500-transaction attachment, preview and download blocked: preview forwards to older external Cloudflare service; corrected server code is bypassed. No supported current-code dev backend is configured; production deploy/new pipelines remain out of scope. No resource/schema/secret changes.
+- [x] Report actual repairs and test evidence; do not claim end-to-end file completion.
+
 ## Current request — Backend-only Cloudflare setup
 - [x] Existing standalone auth-gateway covers OAuth/mail/AI/runtime only, not chat memory, XLSX jobs or attachment APIs; both configs target vision, so deploying that gateway would remove required APIs.
 - [x] Superseded by preview-only scope: do not deploy, separate hosting, or create a new pipeline. No live service replaced.

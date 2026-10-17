@@ -240,8 +240,9 @@ const ChatMessage = forwardRef<HTMLDivElement, Props>(({ message, isNew = false 
   const { toast } = useToast();
   const mountedRef = useRef(false);
 
-  // Animate on first mount for new AI messages only
-  const shouldAnimate = isNew && !isUser && !mountedRef.current;
+  // Validated replies already use the workspace's bounded reveal schedule.
+  // A second character animation can hide long answers after completion.
+  const shouldAnimate = isNew && !isUser && !message.activity && !mountedRef.current;
   useEffect(() => { mountedRef.current = true; }, []);
 
   const segments = useMemo(() => splitContent(message.content), [message.content]);

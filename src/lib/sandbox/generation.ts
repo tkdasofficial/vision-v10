@@ -19,7 +19,8 @@ export function estimateTokens(text: string): number {
  */
 export function buildPlan(instructions: string, outline: string[], opts: { chunkTargetTokens?: number; maxChunks?: number } = {}): Plan {
   const maxChunks = opts.maxChunks ?? MAX_CHUNKS;
-  const sections = outline.map((s) => s.trim()).filter(Boolean).slice(0, maxChunks);
+  const sections = outline.map((s) => s.trim()).filter(Boolean);
+  if (sections.length > maxChunks) throw new Error(`The outline has ${sections.length} sections; the supported maximum is ${maxChunks}. Split the request rather than omit sections.`);
   const budget = opts.chunkTargetTokens ?? CHUNK_TARGET_TOKENS;
   const chunks: ChunkSpec[] = (sections.length ? sections : ["Full response"]).map((title, i) => {
     const dependsOn: number[] = [];
@@ -114,8 +115,10 @@ export function chunkMessages(ctx: ContextLayer, tokenBudget: number): unknown[]
 export type ValidationResult = { ok: true } | { ok: false; problems: string[] };
 
 /** Validates assembled output: no missing chunks, correct order, no duplication. */
-export function validateAssembly(chunks: { seq: number; status: string; content: string | null; checksum: string | null }[]): ValidationResult {
+export function validateAssembly(chunks: { seq: number; status: string; content: string | null; checksum: string | null }[], expectedChunks?: number): ValidationResult {
   const problems: string[] = [];
+  if (!chunks.length) problems.push("No generated sections were saved");
+  if (expectedChunks !== undefined && chunks.length !== expectedChunks) problems.push(`Expected ${expectedChunks} sections, got ${chunks.length}`);
   const sorted = [...chunks].sort((a, b) => a.seq - b.seq);
   sorted.forEach((c, i) => {
     if (c.seq !== i) problems.push(`Chunk sequence gap at position ${i}`);
@@ -124,6 +127,7 @@ export function validateAssembly(chunks: { seq: number; status: string; content:
   const seen = new Map<string, number>();
   for (const c of sorted) {
     if (!c.content) continue;
+    if (c.checksum && c.checksum !== checksum(c.content)) problems.push(`Chunk ${c.seq} content checksum mismatch`);
     const key = c.checksum ?? checksum(c.content);
     const prev = seen.get(key);
     if (prev !== undefined) problems.push(`Chunk ${c.seq} duplicates chunk ${prev}`);
