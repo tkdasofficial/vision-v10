@@ -1,10 +1,10 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
 ## Current request — Resume deployment and prove live Excel delivery
-- [ ] Identify the approved build/deployment path, available GitHub authentication and CI, and why deployable output is absent.
-- [ ] Deploy latest verified code only through a supported existing pipeline; confirm active code/version.
-- [ ] Submit original workbook request in authenticated live chat; register and download the attachment; validate 500 rows, five sheets and three charts.
-- [ ] If interrupted, collect actual server error before any further fix/retry; otherwise report a demonstrated external blocker.
+- [x] Deployment audit: dist is ignored/generated, not source; harness output is not available in this sandbox. README/package scripts describe local Vite build then root Wrangler deploy; manual builds and external Cloudflare hosting deployment from this environment are unsupported.
+- [ ] Deploy latest verified code — external blocker: GitHub vision-v9 main lacks both current workbook branch and delivery guard; GitHub Actions API reports zero app workflows. GitHub PAT authentication returns 200 (CLI absent), so authentication is not the blocker. Runtime workflows are separate and cannot deploy app source under project rules.
+- [ ] Authenticated live chat/download validation — waits on supported external build/deployment of current source. No new submission or download claimed.
+- [x] Demonstrated blocker and checked production: Cloudflare deployment API confirms version d74f493f-b746-4086-9da6-175fd37a2f6d at 100%, created 2026-10-17T07:22:54Z; source read HTTP 200, SHA256 f0d2c7172212540832f2def92db81065e7f4b097f96f1edbc064808c7efbd960, lacks updated business-runner validation marker and Business_Performance_Analysis.xlsx filename. No deployment/mutation or blind retry performed.
 
 ## Current request — Fix and verify in-chat Excel delivery
 - [x] Reproduced twice with authenticated browser evidence: sign-in/API connection works; deployed catalog path incorrectly generates 10 records; both jobs interrupted. First upload reservation reached verified, but no job_artifacts row exists.
