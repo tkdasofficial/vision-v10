@@ -43,7 +43,8 @@ export const Route = createFileRoute("/api/sandbox-generations")({
         // Run detached: the caller polls for status; a reload never duplicates the job.
         const { runJob } = await import("@/lib/sandbox/runner.server");
         const promise = runJob(caller.user.id, job.id).catch((e) => console.error("[sandbox] run failed", (e as Error)?.message));
-        (globalThis as any).__visionWorkerCtx?.waitUntil?.(promise);
+        const { keepAlive } = await import("@/lib/jobs/chat-background.server");
+        keepAlive(promise);
         return Response.json({ job }, { status: 202, headers: { "Cache-Control": "no-store" } });
       },
     },

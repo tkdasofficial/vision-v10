@@ -1,5 +1,11 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Uploaded long-output pipeline repair
+- [ ] Diagnose current preview generation failure and capture the underlying server error before resubmitting interrupted work.
+- [ ] Repair reproducible long-context, assembly, recovery and delivery integration defects with focused regressions.
+- [ ] Verify signed-in long text, long file, 500-transaction workbook, attachment preview and actual download in the unchanged preview; no production deployment or unrelated resource changes.
+- [ ] Report verified results and specific external blockers without substituting local workbook tests for delivery.
+
 ## Current request — Backend-only Cloudflare setup
 - [x] Existing standalone auth-gateway covers OAuth/mail/AI/runtime only, not chat memory, XLSX jobs or attachment APIs; both configs target vision, so deploying that gateway would remove required APIs.
 - [x] Superseded by preview-only scope: do not deploy, separate hosting, or create a new pipeline. No live service replaced.

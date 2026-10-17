@@ -25,6 +25,7 @@ export async function createJob(userId: string, input: { instructions: string; m
   const jobId = input.requestId ?? id();
   await db("INSERT OR IGNORE INTO generation_jobs (id, user_id, instructions, model_config, settings, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)", [jobId, userId, input.instructions, json(input.modelConfig), json(input.settings), now(), now()]);
   const rows: JobRow[] = await db("SELECT * FROM generation_jobs WHERE id = ? AND user_id = ? LIMIT 1", [jobId, userId]);
+  if (!rows[0]) throw new Error("Generation job could not be created for this owner.");
   await event(db, jobId, null, "job_created", "pending");
   return rows[0];
 }
@@ -79,7 +80,7 @@ export async function listChunks(userId: string, jobId: string, db: SandboxDb = 
 /** Claims a chunk for one generation attempt; false when already running/done. */
 export async function claimChunk(userId: string, jobId: string, seq: number, db: SandboxDb = sandboxDb): Promise<ChunkRow | null> {
   const rows: ChunkRow[] = await db(
-    "UPDATE generation_chunks SET status = CASE WHEN status = 'retrying' THEN 'retrying' ELSE 'generating' END, attempts = attempts + 1, updated_at = ? WHERE job_id = ? AND seq = ? AND status IN ('pending','failed','retrying') AND job_id IN (SELECT id FROM generation_jobs WHERE user_id = ?) RETURNING *",
+    "UPDATE generation_chunks SET status = 'generating', attempts = attempts + 1, updated_at = ? WHERE job_id = ? AND seq = ? AND status IN ('pending','failed','retrying') AND job_id IN (SELECT id FROM generation_jobs WHERE user_id = ?) RETURNING *",
     [now(), jobId, seq, userId],
   );
   if (rows[0]) await event(db, jobId, rows[0].id, "chunk_started", rows[0].status, `attempt ${rows[0].attempts}`);
@@ -124,6 +125,9 @@ export async function listEvents(userId: string, jobId: string, db: SandboxDb = 
 }
 
 /** Failed or stale in-flight chunks become retryable; completed work is untouched. */
-export async function markRetryable(userId: string, jobId: string, db: SandboxDb = sandboxDb): Promise<void> {
-  await db("UPDATE generation_chunks SET status = 'retrying', updated_at = ? WHERE job_id = ? AND status IN ('failed','generating','validating') AND job_id IN (SELECT id FROM generation_jobs WHERE user_id = ?)", [now(), jobId, userId]);
+export async function markRetryable(userId: string, jobId: string, db: SandboxDb = sandboxDb, seq?: number): Promise<void> {
+  // In-run retries may reset only their own failed chunk, never another active worker.
+  const states = seq === undefined ? "'failed','generating','validating'" : "'failed'";
+  const guard = seq === undefined ? "" : " AND seq = ?";
+  await db(`UPDATE generation_chunks SET status = 'retrying', updated_at = ? WHERE job_id = ? AND status IN (${states}) AND job_id IN (SELECT id FROM generation_jobs WHERE user_id = ?)${guard}`, [now(), jobId, userId, ...(seq === undefined ? [] : [seq])]);
 }
