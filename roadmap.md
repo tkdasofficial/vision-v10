@@ -1,5 +1,9 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Exact Business Performance Excel verification
+- [ ] Submit the exact 500-transaction, 2025, five-sheet workbook prompt in signed-in preview and capture actual job state/error.
+- [ ] Verify registered XLSX, UI download, formulas, reconciliation, rankings and three chart ranges if delivered; otherwise name the observed blocker without blind retries or production changes.
+
 ## Current request — Uploaded long-output pipeline repair
 - [ ] Underlying interruption error unavailable: signed-in restored job fb85f20a stops at chunk_started, with sandbox generating/zero completed and no saved error. No blind Excel retry; requires server telemetry from the executing backend.
 - [x] Repaired dependency context, chunk retry isolation/atomic claiming, full-plan count/checksum validation, silent outline truncation, unexpected failure persistence, parallel settlement and sandbox background keeper wiring. Seven new regressions; full suite 1435 passed, 1 skipped; automatic build OK.
