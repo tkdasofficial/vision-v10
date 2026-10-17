@@ -1,10 +1,11 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
 ## Current request — Uploaded long-output pipeline repair
-- [ ] Diagnose current preview generation failure and capture the underlying server error before resubmitting interrupted work.
-- [ ] Repair reproducible long-context, assembly, recovery and delivery integration defects with focused regressions.
-- [ ] Verify signed-in long text, long file, 500-transaction workbook, attachment preview and actual download in the unchanged preview; no production deployment or unrelated resource changes.
-- [ ] Report verified results and specific external blockers without substituting local workbook tests for delivery.
+- [ ] Underlying interruption error unavailable: signed-in restored job fb85f20a stops at chunk_started, with sandbox generating/zero completed and no saved error. No blind Excel retry; requires server telemetry from the executing backend.
+- [x] Repaired dependency context, chunk retry isolation/atomic claiming, full-plan count/checksum validation, silent outline truncation, unexpected failure persistence, parallel settlement and sandbox background keeper wiring. Seven new regressions; full suite 1435 passed, 1 skipped; automatic build OK.
+- [x] Signed-in long-text request saved 1583 words; initial screen showed only first section, reload showed 1616 visible words including all eight sections. Removed duplicate legacy animation for replies already handled by bounded workspace reveal; fresh check pending below.
+- [ ] Long file/500-transaction attachment, preview and download blocked: preview forwards to older external Cloudflare service; corrected server code is bypassed. No supported current-code dev backend is configured; production deploy/new pipelines remain out of scope. No resource/schema/secret changes.
+- [x] Report actual repairs and test evidence; do not claim end-to-end file completion.
 
 ## Current request — Backend-only Cloudflare setup
 - [x] Existing standalone auth-gateway covers OAuth/mail/AI/runtime only, not chat memory, XLSX jobs or attachment APIs; both configs target vision, so deploying that gateway would remove required APIs.
