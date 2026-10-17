@@ -1,5 +1,11 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Resume deployment and prove live Excel delivery
+- [ ] Identify the approved build/deployment path, available GitHub authentication and CI, and why deployable output is absent.
+- [ ] Deploy latest verified code only through a supported existing pipeline; confirm active code/version.
+- [ ] Submit original workbook request in authenticated live chat; register and download the attachment; validate 500 rows, five sheets and three charts.
+- [ ] If interrupted, collect actual server error before any further fix/retry; otherwise report a demonstrated external blocker.
+
 ## Current request — Fix and verify in-chat Excel delivery
 - [x] Reproduced twice with authenticated browser evidence: sign-in/API connection works; deployed catalog path incorrectly generates 10 records; both jobs interrupted. First upload reservation reached verified, but no job_artifacts row exists.
 - [x] Preserved workbook writer; repaired false delivery announcement on restored tasks, required completed status plus artifacts, restored fallback Retry control, kept expired workbook contents private. Full suite: 1428 passed, 1 skipped; automatic build OK; authenticated browser confirms Retry available and no false delivery sentence.
