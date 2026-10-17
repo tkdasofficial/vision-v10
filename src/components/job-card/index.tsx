@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { JOB_STATUSES, isTerminal, type JobView } from "@/lib/builder/statuses";
-import { cancelJob, downloadUrl, fetchJob } from "@/lib/builder/jobs-client";
+import { cancelJob, downloadUrl, fetchJob, retryJob } from "@/lib/builder/jobs-client";
 import { downloadFile } from "@/lib/download";
 import { toast } from "sonner";
 import TaskStatus from "@/components/task-status";
@@ -68,6 +68,14 @@ export default function JobCard({ job: given, onRetry, compact }: { job: JobView
   }, [given.id]);
   const [open, setOpen] = useState(!compact);
   const [cancelling, setCancelling] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const retry = async () => {
+    if (onRetry) { onRetry(job.id); return; }
+    setRetrying(true);
+    try { await retryJob(job.id, setJob); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "The task couldn't restart."); }
+    finally { setRetrying(false); }
+  };
   const running = !isTerminal(job.status);
   const visible = visibleJobStatus(job);
   const stageLabel = workStateLabel(workStateForJob(visible.status)) ?? JOB_STATUSES[visible.status];
@@ -108,7 +116,7 @@ export default function JobCard({ job: given, onRetry, compact }: { job: JobView
         </div>
         <div className="flex shrink-0 gap-1">
           {running && <Button size="sm" variant="ghost" disabled={cancelling} onClick={async () => { setCancelling(true); await cancelJob(job.id).catch(() => setCancelling(false)); }} aria-label="Cancel task"><Square className="h-3.5 w-3.5" /></Button>}
-          {(job.status === "failed" || job.status === "cancelled" || job.status === "timed_out") && onRetry && <Button size="sm" variant="ghost" onClick={() => onRetry(job.id)} aria-label="Retry task"><RotateCcw className="h-3.5 w-3.5" /></Button>}
+          {(job.status === "failed" || job.status === "cancelled" || job.status === "timed_out") && <Button size="sm" variant="ghost" disabled={retrying} onClick={retry} aria-label="Retry task"><RotateCcw className="h-3.5 w-3.5" /></Button>}
           <Button size="sm" variant="ghost" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Show details"><ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} /></Button>
         </div>
       </div>

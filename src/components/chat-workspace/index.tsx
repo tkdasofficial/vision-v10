@@ -24,6 +24,7 @@ import { revealPlan } from "@/lib/ai/render-scheduler";
 import { getCategory } from "@/lib/file-converter";
 import { runJob, listJobs, fetchJob, cancelJob } from "@/lib/builder/jobs-client";
 import { isTerminal } from "@/lib/builder/statuses";
+import { hasDeliveredFile } from "@/lib/builder/file-delivery";
 import type { ChatMode } from "@/lib/ai/modes";
 import { saveDocumentFn } from "@/lib/cloud/documents.functions";
 import { useBackgroundTasks, type BackgroundTask } from "@/hooks/useBackgroundTasks";
@@ -262,7 +263,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
     trackJob(jobId, true);
     const show = (job: import("@/lib/builder/statuses").JobView) => setMessages((prev) => {
       // While running: the work-state line only — no intro sentence, no card.
-      const content = !isTerminal(job.status) ? "" : job.status === "failed" || job.status === "timed_out" ? `That didn't work: ${job.error ?? "unknown error"}` : job.status === "cancelled" ? "Task cancelled." : done;
+      const content = !isTerminal(job.status) ? "" : job.status === "failed" || job.status === "timed_out" ? `That didn't work: ${job.error ?? "unknown error"}` : job.status === "cancelled" ? "Task cancelled." : hasDeliveredFile(job) ? done : "";
       const msg: ChatMessageType = { id: msgId, role: "assistant", content, timestamp: new Date(), job };
       return prev.some((m) => m.id === msgId) ? prev.map((m) => (m.id === msgId ? msg : m)) : [...prev, msg];
     });
@@ -281,7 +282,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
         const have = new Set(prev.map((m) => m.job?.id).filter(Boolean));
         const missing = jobs.filter((j) => !have.has(j.id)).map((j): ChatMessageType => ({
           id: `job-${j.id}`, role: "assistant", timestamp: new Date(j.createdAt), job: j,
-          content: j.status === "failed" || j.status === "timed_out" ? `That didn't work: ${j.error ?? "unknown error"}` : j.type === "zip_analyze" ? `Analysis of **${j.result?.fileName ?? "your ZIP"}**` : j.type === "project_generate" ? "Here's your project." : j.type === "agent_task" || j.type === "runtime_task" ? "Here's the result." : "Here's your file.", // long_context completes with a downloadable file
+          content: !isTerminal(j.status) ? "" : j.status === "failed" || j.status === "timed_out" ? `That didn't work: ${j.error ?? "unknown error"}` : j.status === "cancelled" ? "Task cancelled." : j.type === "zip_analyze" ? `Analysis of **${j.result?.fileName ?? "your ZIP"}**` : j.type === "project_generate" && hasDeliveredFile(j) ? "Here's your project." : j.type === "agent_task" || j.type === "runtime_task" ? "Here's the result." : hasDeliveredFile(j) ? "Here's your file." : "",
         }));
         if (!missing.length) return prev;
         // A task starts the instant its question is sent, but older chats saved the question a moment later

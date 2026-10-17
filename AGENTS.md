@@ -10,7 +10,7 @@
 <!-- LOVABLE:END -->
 
 - Read scoped `src/AGENTS.md` and `src/lib/AGENTS.md` before edits.
-- File-job output visibility is decided by the pure `src/lib/builder/file-delivery.ts` policy and enforced in JobCard for both fresh and restored results; runners preserve the request for explicit content opt-in. Why: download delivery must not automatically duplicate file contents in chat.
+- File delivery uses `builder/file-delivery.ts` for fresh/restored results: success plus artifacts before delivery, content only on opt-in; JobCard owns fallback retry. Why: no fake files, duplicate contents or missing retry.
 - Chat attachment Plugins uses one controlled Popover anchored to the composer, selecting via the plugin-chip callback. Why: picker stays above the input without navigation or duplicated send logic.
 - Credentials live only in Cloudflare Secrets/Variables or its Secrets Store, read at runtime, never in Lovable secrets. Why: Cloudflare is the credential source of truth.
 - GitHub CLI is only for `tkdasofficial/vision-runtime` provisioning, workflows, runtime and tests; never app source edits. Why: runtime and app source stay separate.

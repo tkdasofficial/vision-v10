@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { wantsFileContents, canShowJobContents } from "@/lib/builder/file-delivery";
+import { wantsFileContents, canShowJobContents, hasDeliveredFile } from "@/lib/builder/file-delivery";
 import type { JobView } from "@/lib/builder/statuses";
 import JobCard from "@/components/job-card";
 
@@ -14,6 +14,15 @@ const job = (prompt: string, overrides: Partial<JobView> = {}): JobView => ({
 });
 
 describe("file-only delivery policy", () => {
+  it("requires success and a registered attachment before declaring delivery", () => {
+    expect(hasDeliveredFile(job("Create XLSX"))).toBe(true);
+    expect(hasDeliveredFile(job("Create XLSX", { status: "saving" }))).toBe(false);
+    expect(hasDeliveredFile(job("Create XLSX", { status: "failed" }))).toBe(false);
+    expect(hasDeliveredFile(job("Create XLSX", { artifacts: [] }))).toBe(false);
+  });
+  it("keeps workbook contents private after attachments expire", () => {
+    expect(canShowJobContents(job("Create XLSX", { type: "long_context", artifacts: [], result: null }))).toBe(false);
+  });
   it.each(["Create a PDF of the story", "Create a TXT file", "Convert this CSV to JSON", "Translate the report and save it as DOCX", "Rewrite this and deliver a file"])("defaults to file only: %s", (prompt) => {
     expect(canShowJobContents(job(prompt))).toBe(false);
   });

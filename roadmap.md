@@ -1,5 +1,12 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Fix and verify in-chat Excel delivery
+- [x] Reproduced twice with authenticated browser evidence: sign-in/API connection works; deployed catalog path incorrectly generates 10 records; both jobs interrupted. First upload reservation reached verified, but no job_artifacts row exists.
+- [x] Preserved workbook writer; repaired false delivery announcement on restored tasks, required completed status plus artifacts, restored fallback Retry control, kept expired workbook contents private. Full suite: 1428 passed, 1 skipped; automatic build OK; authenticated browser confirms Retry available and no false delivery sentence.
+- [ ] Generate the original workbook through chat and validate its download — blocked by older live service; two attempts failed. Local writer independently verified: 500 rows, five worksheets, three charts, 1745 recalculated formulas, zero errors, 2025 month coverage, source/summary reconciliation, rankings, freeze panes and filters. This is not a chat-download pass.
+- [ ] Deploy fresh version and repeat live check — no dist/server or dist/client artifacts exist in this sandbox; hosted preview validation does not expose a deployable bundle. Manual builds are prohibited and the supported Publish tool does not update the existing external Worker. Active version remains d74f493f-b746-4086-9da6-175fd37a2f6d; no deployment made.
+- [x] Reported evidence and blocker; retries bounded to two real generation attempts, no background retry remains.
+
 ## Current request — Repair memory and Excel generation
 - [x] Review latest app conversations and identify memory/file-generation failures.
 - [x] Repair chat-level and permanent-memory paths with regression tests.
@@ -14,7 +21,7 @@
 - [x] Pipeline in src/lib/sandbox/ (pure generation.ts, store.server.ts, runner.server.ts): outline plan → parallel independent chunks / sequential dependencies → retry failed only → resume from checkpoints → assemble → validate (gaps/order/duplication) → output.
 - [x] Endpoints /api/sandbox-generations (+ /$jobId with status/chunks/output/events views and retry/resume/cancel), owner-scoped, same proxy/auth/CSRF conventions as existing routes.
 - [x] 17 new tests in src/test/sandbox-generation.test.ts; full suite 1392 passed | 1 skipped; typecheck clean; automatic build OK.
-- [ ] Deploy the Worker (`npx wrangler deploy`) so the SANDBOX_DB binding is live; wire a UI entry point to the endpoints (none added — API only so far).
+- [x] Verified live Worker has SANDBOX_DB binding; long-context chat jobs use it. Standalone sandbox screen is not requested.
 
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
@@ -34,7 +41,7 @@
 - [x] Default all file creation/transformation replies to file delivery without in-file content.
 - [x] Show requested contents underneath the delivered file only on explicit opt-in.
 - [x] Run delivery regression tests and full suite; verify file/download rendering through automated tests.
-- [ ] Signed-in preview file-generation check — blocked: available test-account sign-in returned to login; no file request ran.
+- [x] Signed-in preview file-generation check executed twice; both failed on the old live runner, with no attachment registered. Full delivery remains blocked under the current Excel task above.
 
 Spec: user-uploaded VISION memory/output/artifact/activity integration doc (5 tasks, sequential gates).
 
