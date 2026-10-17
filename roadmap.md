@@ -1,5 +1,12 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Fix and verify in-chat Excel delivery
+- [ ] Reproduce the preview connection and private file failure with authenticated browser evidence.
+- [ ] Repair diagnosed causes, preserve the workbook writer, and run focused regressions.
+- [ ] Generate the original workbook through chat and independently validate its downloaded binary.
+- [ ] Deploy a freshly validated version to the existing service and repeat the live chat/download check; never deploy stale output.
+- [ ] Report deployment version, evidence, validation results, and any exact blocker.
+
 ## Current request — Repair memory and Excel generation
 - [x] Review latest app conversations and identify memory/file-generation failures.
 - [x] Repair chat-level and permanent-memory paths with regression tests.
