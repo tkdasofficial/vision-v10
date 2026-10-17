@@ -1,10 +1,10 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
 ## Current request — Restore file results after leaving/reloading
-- [ ] Diagnose missing result against signed-in saved chat and task records.
-- [ ] Repair task restoration and named download controls; add regression coverage.
-- [ ] Verify accepted background task survives leaving/reload and restored file downloads in preview.
-- [ ] Report verified outcome and any external blocker without guaranteeing unlimited Worker lifetime.
+- [x] Signed-in inspection found completed job 9710277d with registered XLSX; mobile button overflow reproduced. Restore requests silently failed without retry; closing during the 800ms question-save delay could lose the question.
+- [x] Wrapped named download button, simplified completed XLSX result, retry failed job-list/status reads, merge tasks by id, commit question/session before dispatch. 67 targeted tests passed; automatic build OK.
+- [x] Two real workbook jobs completed after leaving/reloading. Final job 4babee21-d162-4ae0-b344-fa37ef0f0f07, chat 468a9294-5e44-4a68-aeeb-fd25953468b5: downloaded 73,215-byte XLSX after reload; fresh login restored question and download. Mobile/desktop inspected, no page errors; ZIP valid, 500 sales rows, five sheets, three charts, 1,745 formulas, zero stored error cells (no recalculation this turn).
+- [x] Existing preview URL/backend unchanged; no deployment. Existing seven-day artifact expiry and session-list 30-job cap remain; unlimited Worker lifetime is not guaranteed. This task's leave/reload flow verified, long-duration Worker termination and >30-job chat recovery not claimed.
 
 ## Current request — Exact Business Performance Excel verification
 - [x] Submitted exact prompt signed-in: chat 901defbe-3d4b-4c39-b755-1fe94d6ba8f5, job 8e861346-fdda-43b1-b66a-51a6f6b4db57 accepted HTTP 200 at 09:15:22 UTC; incorrectly selected 10 records, failed at 09:18:52 as interrupted. Screenshot confirms failed card; main D1 confirms zero artifacts.
