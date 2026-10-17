@@ -4,8 +4,9 @@
 - [x] Review latest app conversations and identify memory/file-generation failures.
 - [x] Repair chat-level and permanent-memory paths with regression tests.
 - [x] Repair XLSX generation and long-running execution with regression tests.
-- [x] Run regression suite and check automatic build results: 1424 passed, 1 skipped; build OK; independent workbook recalculation: 1745 formulas, zero errors, five-sheet totals reconcile.
-- [ ] Verify signed-in chat recall, new-chat permanent recall, workbook download and reload recovery; requires an available user session.
+- [x] Run regression suite and check automatic build results: 1426 passed, 1 skipped; build OK; independent workbook recalculation: 1745 formulas, zero errors, five-sheet totals reconcile.
+- [x] Signed-in chat-only recall after reload, permanent save, new-chat permanent recall and reload persistence verified; temporary permanent test memory removed.
+- [ ] Activate current fixes on Cloudflare and verify in-chat workbook download: blocked because available dist/server output predates these edits and automatic validation does not refresh that deployment output; live Worker uses the older catalog runner, which interrupted the workbook task. Private file upload also failed. Verified workbook delivered separately in Files.
 
 ## Current request — vision-sandbox D1 + long-context generation
 - [x] Created "vision-sandbox" D1 (id 4d8098d8-e148-46ea-9e79-b4d35c148c8f), SANDBOX_DB binding in wrangler.toml; schema applied local + remote (6 tables verified live).
@@ -65,8 +66,8 @@ Spec: user-uploaded VISION memory/output/artifact/activity integration doc (5 ta
 - [x] Verified: reload mid-answer → live "Writing" status restored → answer appears once; provider failure → clear note, no spinner
 
 ## Current request — Autonomous user-level QA for Long Context Generation (500-record Excel)
-- [ ] New job type `long_context` routed from chat, driving the vision-sandbox pipeline (plan/chunks in D1, resume on retry)
-- [ ] Real .xlsx output stage: catalog planning, per-chunk JSON records, validation (500 rows, 16 cols, unique IDs/SKUs, rating 1-5), writeXlsx with frozen header/filter/widths/formats
-- [ ] Tests: pure helpers + pipeline with in-memory sandbox double + request routing + xlsx options
-- [ ] Deploy Worker after build passes
-- [ ] Playwright QA loop on the deployed app: UI login (credentials from env, never logged), submit workload via chat, observe progress, download workbook, independent validation, reload persistence; RUN→OBSERVE→DIAGNOSE→FIX→RETEST until PASS/BLOCKED; structured final report
+- [x] New job type `long_context` routed from chat, driving the vision-sandbox pipeline (plan/chunks in D1, resume on retry)
+- [x] Real .xlsx output stage with catalog validation and native business workbook formulas/charts.
+- [x] Tests: pure helpers + pipeline with in-memory sandbox double + request routing + xlsx options + invalid-record automatic retries.
+- [ ] Deploy current Worker — blocked by stale deployment output; do not deploy the old bundle.
+- [ ] In-chat workbook delivery — live older Worker interrupted the task; independently verified workbook delivered in Files, full signed-in download flow remains unverified.
