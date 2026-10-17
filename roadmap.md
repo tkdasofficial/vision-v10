@@ -4,6 +4,11 @@
 - [x] Existing standalone auth-gateway covers OAuth/mail/AI/runtime only, not chat memory, XLSX jobs or attachment APIs; both configs target vision, so deploying that gateway would remove required APIs.
 - [ ] Configure/deploy only the backend — requires separating the full API entrypoint from the combined app server; awaiting user choice before changing that architecture. No live service replaced.
 
+## Current request — Existing preview backend verification
+- [ ] Inventory preview routing, required resources, bindings and configured credential access without exposing secrets.
+- [ ] Repair only demonstrated development setup issues; preserve existing data, exact preview URL, and production resources. No production deployment or new pipeline.
+- [ ] Verify signed-in authentication, persistence, memory and actual Excel job/download in the existing preview; record concrete failure and server-side cause when blocked.
+
 ## Current request — Resume deployment and prove live Excel delivery
 - [x] Deployment audit: dist is ignored/generated, not source; harness output is not available in this sandbox. README/package scripts describe local Vite build then root Wrangler deploy; manual builds and external Cloudflare hosting deployment from this environment are unsupported.
 - [ ] Deploy latest verified code — external blocker: GitHub vision-v9 main lacks both current workbook branch and delivery guard; GitHub Actions API reports zero app workflows. GitHub PAT authentication returns 200 (CLI absent), so authentication is not the blocker. Runtime workflows are separate and cannot deploy app source under project rules.
