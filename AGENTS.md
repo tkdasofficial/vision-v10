@@ -9,11 +9,11 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
-- Read scoped rules in `src/AGENTS.md` and `src/lib/AGENTS.md` before edits; storage rules live there.
+- Read scoped `src/AGENTS.md` and `src/lib/AGENTS.md` before edits.
 - File-job output visibility is decided by the pure `src/lib/builder/file-delivery.ts` policy and enforced in JobCard for both fresh and restored results; runners preserve the request for explicit content opt-in. Why: download delivery must not automatically duplicate file contents in chat.
 - Chat attachment Plugins uses one controlled Popover anchored to the composer, selecting via the plugin-chip callback. Why: picker stays above the input without navigation or duplicated send logic.
 - Credentials live only in Cloudflare Secrets/Variables or its Secrets Store, read at runtime, never in Lovable secrets. Why: Cloudflare is the credential source of truth.
-- GitHub CLI (`gh`) is used only for runtime setup tasks sourced from `tkdasofficial/vision-runtime` (runtime provisioning, its `.github` workflows, `runtime/` and `tests/` material); never for app source, code edits, or day-to-day changes. Why: keeps the app codebase (from `tkdasofficial/vision-v7`) separate from runtime provisioning.
+- GitHub CLI is only for `tkdasofficial/vision-runtime` provisioning, workflows, runtime and tests; never app source edits. Why: runtime and app source stay separate.
 
 - Page UIs live in `src/pages/<page>/index.tsx` (Admin stays in `src/views/admin/`), reusable UI in `src/components/<name>/index.tsx` (shadcn `ui/` keeps its flat files); route files only wrap a page. Old URLs are mapped once in `src/lib/legacy-routes.ts` and redirected by thin legacy route files; OAuth callbacks, `/auth/verify` and APIs are never redirected. Page access is decided in `src/lib/route-access.ts` and enforced once by `RouteGuard` in `__root.tsx`; a failed session check means retry, never signed out. Why: one rule set, no flashes or false logouts.
 - Navigate via `@/lib/router-compat`, never react-router-dom. Why: preserves simple calls over TanStack Router.
@@ -27,3 +27,5 @@
 
 - Chat replies run detached from the browser (Worker waitUntil; the off-Worker proxy keeps draining SSE after disconnect); the server saves the answer into chat_messages under the client reply id (INSERT OR IGNORE) and records stage/heartbeat/outcome in D1 `chat_generations`; a reopened chat with an unanswered question reads `/api/chat-status` to restore status or show the failure, never resending. Why: reloads never lose, duplicate or freeze a reply.
 - All AI (chat, Deep, jobs, vision, transcription) runs on Cloudflare. Off-Worker APIs proxy to API_ORIGIN; helpers use `aiRelayConfig()` → API_ORIGIN `/ai/:provider` or `/ai/run` (legacy AUTH_GATEWAY_URL fallback), with allowlisted AUTH_ORIGIN. Never use hosting keys or call providers off Worker, even after relay failure. Worker bindings override process values. Why: Cloudflare alone holds AI credentials.
+
+- Restore owner-scoped saved chat history before references; business XLSX uses the deterministic formula/chart writer in file jobs. Why: follow-ups keep sources and files never degrade into blueprints.

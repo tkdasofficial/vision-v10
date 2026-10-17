@@ -28,11 +28,16 @@ export const Route = createFileRoute("/api/chat")({
         const workSignal = new AbortController().signal;
         const { keepAlive, saveReply } = await import("@/lib/jobs/chat-background.server");
         const body: any = await request.json().catch(() => null);
-        const raw = Array.isArray(body?.messages) ? body.messages.slice(-200) : [];
+        const chatId = typeof body?.conversationId === "string" ? body.conversationId.slice(0, 64) : undefined;
+        const { loadConversationHistory } = await import("@/lib/ai/memory.server");
+        const { restoreConversationHistory } = await import("@/lib/ai/conversation-history");
+        const incoming = Array.isArray(body?.messages) ? body.messages.slice(-200) : [];
+        const raw = restoreConversationHistory(await loadConversationHistory(caller.user.id, chatId), incoming);
+        if (body) body.messages = raw;
         let lastHasMedia = false;
         const messages = raw
           .map((m: any, i: number) => {
-            const role = m.role === "assistant" ? "assistant" : "user";
+            const role: "user" | "assistant" = m.role === "assistant" ? "assistant" : "user";
             if (typeof m.content === "string") return { role, content: m.content.slice(0, 20000) };
             if (!Array.isArray(m.content)) return { role, content: "" };
             const text = m.content.filter((p: any) => p.type === "text").map((p: any) => String(p.text ?? "")).join("\n").slice(0, 20000);
@@ -67,7 +72,6 @@ export const Route = createFileRoute("/api/chat")({
         // One query loads prefs + this chat's project and its Memory setting (owner-checked).
         const { loadChatContext, loadProjectMemory } = await import("@/lib/ai/memory.server");
         const { includesPersonal } = await import("@/lib/ai/memory");
-        const chatId = typeof body?.conversationId === "string" ? body.conversationId.slice(0, 64) : undefined;
         const chatCtx = await loadChatContext(caller.user.id, chatId);
         const prefs = parsePrefs(chatCtx.prefsRaw);
         let system = `${systemPromptFor(task)}\n\n${promptAddendum(prefs, { personal: includesPersonal(chatCtx.scope) })}`;
@@ -172,7 +176,7 @@ export const Route = createFileRoute("/api/chat")({
         // this chat (not only the budgeted window) and attach the exact original content.
         {
           const { resolveReference, sourceBlock, workingContext } = await import("@/lib/ai/references");
-          const fullHist = (Array.isArray(body?.messages) ? body.messages.slice(-200, -1) : []).map((m: any) => ({ role: m.role === "assistant" ? "assistant" : "user", content: typeof m.content === "string" ? m.content : Array.isArray(m.content) ? m.content.filter((p: any) => p.type === "text").map((p: any) => String(p.text ?? "")).join("\n") : "" }));
+          const fullHist = (Array.isArray(body?.messages) ? body.messages.slice(0, -1) : []).map((m: any) => ({ role: m.role === "assistant" ? "assistant" : "user", content: typeof m.content === "string" ? m.content : Array.isArray(m.content) ? m.content.filter((p: any) => p.type === "text").map((p: any) => String(p.text ?? "")).join("\n") : "" }));
           const ref = resolveReference(lastText, fullHist as any);
           retrieved = ref.kind === "found" ? `Using ${ref.label}` : null;
           if (ref.kind === "found") system += `\n\n${sourceBlock(ref)}`;

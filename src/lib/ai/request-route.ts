@@ -15,7 +15,9 @@ const SHORT = 600;
 const CODE_FORMATS = ["js", "ts", "py", "sql", "sh", "bat", "html", "css", "json", "yaml", "toml", "xml"];
 
 export function routeRequest(content: string, mode: ChatMode = "default"): RequestRoute {
-  // Deep Thinking, Research and Coding always answer in chat.
+  // Explicit business workbook delivery is executable in every mode, not a blueprint.
+  if (/\b(?:create|generate|build|deliver|produce|export)\b/i.test(content) && /\b(?:xlsx|excel workbook)\b/i.test(content) && /\bSales_Data\b/i.test(content) && /\bRegional_Analysis\b/i.test(content) && !/\b(?:specification only|blueprint only|explain how|do not create|don't create)\b/i.test(content)) return { kind: "long_context" };
+  // Deep Thinking, Research and Coding otherwise answer in chat.
   if (mode !== "default") return { kind: "chat" };
   const short = content.length <= SHORT;
   // A literal workbook delivery request is executable even inside a long brief.

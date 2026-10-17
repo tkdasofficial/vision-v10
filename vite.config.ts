@@ -33,6 +33,13 @@ export default defineConfig({
       },
     },
     plugins: [
+      {
+        name: "vision-dev-backend-origin",
+        configureServer() {
+          // Public development configuration only; credentials remain on Cloudflare.
+          process.env["API_ORIGIN"] ||= "https://vision.tusharkantidasofficial.workers.dev";
+        },
+      },
       // Only the browser build gets a service worker; it is written next to the public files.
       ...VitePWA({
         strategies: "generateSW",

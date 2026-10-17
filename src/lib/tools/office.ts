@@ -6,7 +6,7 @@ const colName = (i: number) => { let s = ""; i++; while (i) { const m = (i - 1) 
 const colIndex = (ref: string) => { let n = 0; for (const c of ref.replace(/\d/g, "")) n = n * 26 + (c.charCodeAt(0) - 64); return n - 1; };
 const unxml = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 
-export type FormulaCell = { formula: string; value: number; style?: number };
+export type FormulaCell = { formula: string; value: number | string; style?: number };
 export type Sheet = { name: string; rows: unknown[][]; colStyles?: Record<number, number>; widths?: number[] };
 
 /** Optional spreadsheet presentation: frozen header, filters, column widths and
@@ -30,6 +30,7 @@ export function writeXlsx(sheets: Sheet[], opts: WriteXlsxOpts = {}): Uint8Array
       const style = formula?.style ?? (ri === 0 ? 1 : (v !== "" && v != null ? (s.colStyles ?? opts.colStyles)?.[ci] : undefined));
       const st = style ? ` s="${style}"` : "";
       if (formula) {
+        if (typeof formula.value === "string") return `<c r="${ref}" t="str"${st}><f>${x(formula.formula.replace(/^=/, ""))}</f><v>${x(formula.value)}</v></c>`;
         if (!Number.isFinite(formula.value)) throw new Error(`Invalid formula result at ${s.name}!${ref}`);
         return `<c r="${ref}"${st}><f>${x(formula.formula.replace(/^=/, ""))}</f><v>${formula.value}</v></c>`;
       }

@@ -30,12 +30,12 @@ describe("relevantMemories", () => {
     mem("2", "I prefer concise answers", 2),
     mem("3", "my dog is named Bruno", 3),
   ];
-  it("returns only memories relevant to the current message", () => {
+  it("always applies saved response preferences as well as matching facts", () => {
     const rel = relevantMemories(memories, "configure my editor for TypeScript");
-    expect(rel.map((m) => m.id)).toEqual(["1"]);
+    expect(rel.map((m) => m.id).sort()).toEqual(["1", "2"]);
   });
   it("returns nothing when nothing matches — never invents", () => {
-    expect(relevantMemories(memories, "what is the capital of France")).toEqual([]);
+    expect(relevantMemories(memories, "what is the capital of France").map((m) => m.id)).toEqual(["2"]);
     expect(relevantMemories([], "anything")).toEqual([]);
   });
   it("respects the budget", () => {

@@ -87,7 +87,8 @@ export async function savePermanentMemory(userId: string, content: string, sourc
       return { memory: { id: plan.id, content: trimmed, createdAt: now }, plan };
     }
     const mem: PermanentMemory = { id: crypto.randomUUID(), content: trimmed, createdAt: now };
-    await d1("INSERT INTO user_memories (id, user_id, content, created_at, updated_at, source) VALUES (?, ?, ?, ?, ?, ?)", [mem.id, userId, mem.content, now, now, source]);
+    const inserted = await d1("INSERT INTO user_memories (id, user_id, content, created_at, updated_at, source) VALUES (?, ?, ?, ?, ?, ?) RETURNING id", [mem.id, userId, mem.content, now, now, source]);
+    if (!inserted.length) return null;
     return { memory: mem, plan };
   } catch {
     return null;
@@ -110,4 +111,12 @@ export async function deletePermanentMemories(userId: string, ids: string[] | "a
   } catch {
     return null;
   }
+}
+
+/** Restore this user's saved conversation before budgeting or resolving references. */
+export async function loadConversationHistory(userId: string, chatId: string | undefined): Promise<{ role: "user" | "assistant"; content: string }[]> {
+  if (!chatId || !/^[\w-]{1,64}$/.test(chatId)) return [];
+  const rows = await d1(`SELECT m.role, m.content FROM chat_messages m JOIN chat_sessions s ON s.id = m.session_id
+    WHERE s.id = ? AND s.user_id = ? AND m.role IN ('user','assistant') ORDER BY m.created_at ASC LIMIT 1000`, [chatId, userId]).catch(() => []);
+  return rows.filter((r) => typeof r.content === "string" && r.content.trim()).map((r) => ({ role: r.role === "assistant" ? "assistant" : "user", content: r.content }));
 }

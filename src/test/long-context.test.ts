@@ -242,4 +242,18 @@ describe("pipeline (mocked provider, in-memory sandbox)", () => {
     await expect(runPipeline("u1", "req-1", prompt, { db, call: call as any })).rejects.toThrow();
     expect([...jobs.values()][0].status).toBe("failed");
   });
+  it("automatically retries invalid records and keeps accepted sections", async () => {
+    const { db } = memDb();
+    const seen: string[] = [];
+    const good = fakeCall(seen);
+    let invalid = true;
+    const call = async (messages: unknown[]) => {
+      const t = JSON.stringify(messages);
+      if (invalid && t.includes("Records 1-50:")) { invalid = false; return { ok: true, text: "not JSON" }; }
+      return good(messages);
+    };
+    const result = await runPipeline("u1", "retry-invalid", prompt, { db, call });
+    expect(result.rows).toHaveLength(200);
+    expect(seen.filter((s) => s === "1-50")).toHaveLength(1);
+  });
 });

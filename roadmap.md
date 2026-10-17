@@ -1,10 +1,10 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
 ## Current request — Repair memory and Excel generation
-- [ ] Review latest app conversations and identify memory/file-generation failures.
-- [ ] Repair chat-level and permanent-memory paths with regression tests.
-- [ ] Repair XLSX generation and long-running execution with regression tests.
-- [ ] Run regression suite and check automatic build results.
+- [x] Review latest app conversations and identify memory/file-generation failures.
+- [x] Repair chat-level and permanent-memory paths with regression tests.
+- [x] Repair XLSX generation and long-running execution with regression tests.
+- [x] Run regression suite and check automatic build results: 1424 passed, 1 skipped; build OK; independent workbook recalculation: 1745 formulas, zero errors, five-sheet totals reconcile.
 - [ ] Verify signed-in chat recall, new-chat permanent recall, workbook download and reload recovery; requires an available user session.
 
 ## Current request — vision-sandbox D1 + long-context generation
