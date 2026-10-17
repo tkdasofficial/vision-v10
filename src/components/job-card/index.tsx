@@ -13,14 +13,16 @@ import TaskStatus from "@/components/task-status";
 import { visibleJobStatus } from "@/lib/status-visibility";
 import { workStateForJob, workStateLabel } from "@/lib/ai/work-status";
 import { canShowJobContents } from "@/lib/builder/file-delivery";
+import { followJob } from "@/lib/builder/job-recovery";
 
 /** Downloads through an authenticated fetch so the session always reaches the server. */
 function ArtifactButton({ id, name, size }: { id: string; name: string; size?: string }) {
   const [busy, setBusy] = useState(false);
   return (
-    <Button type="button" size="sm" variant="secondary" className="rounded-full" disabled={busy} aria-label={`Download ${name}`}
+    <Button type="button" size="sm" variant="secondary" className="h-auto min-h-12 w-full max-w-full justify-start gap-3 rounded-lg px-3 py-2 text-left whitespace-normal sm:w-auto" disabled={busy} aria-label={`Download ${name}`} title={`Download ${name}`}
       onClick={async () => { setBusy(true); try { await downloadFile(downloadUrl(id), name); } catch (e: any) { toast.error(e?.message || "The file couldn't be downloaded."); } finally { setBusy(false); } }}>
-      {busy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1.5 h-3.5 w-3.5" />}{name}{size && <span className="ml-1 text-muted-foreground">{size}</span>}
+      {busy ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Download className="h-4 w-4 shrink-0" />}
+      <span className="min-w-0 flex-1"><span className="block break-all">{name}</span><span className="block text-xs font-normal text-muted-foreground">{busy ? "Downloading…" : "Download"}{size && ` · ${size}`}</span></span>
     </Button>
   );
 }
@@ -55,15 +57,7 @@ export default function JobCard({ job: given, onRetry, compact }: { job: JobView
   // Reload the stored state (e.g. after a page refresh) and keep following it until it finishes.
   useEffect(() => {
     let stop = false;
-    (async () => {
-      for (;;) {
-        const j = await fetchJob(given.id).catch(() => null);
-        if (stop) return;
-        if (j) setJob((cur) => ((!isTerminal(cur.status) || isTerminal(j.status)) && Date.parse(j.updatedAt) >= Date.parse(cur.updatedAt) ? j : cur));
-        if (!j || isTerminal(j.status)) return;
-        await new Promise((r) => setTimeout(r, 2000));
-      }
-    })();
+    void followJob(given.id, fetchJob, (j) => setJob((cur) => ((!isTerminal(cur.status) || isTerminal(j.status)) && Date.parse(j.updatedAt) >= Date.parse(cur.updatedAt) ? j : cur)), () => stop);
     return () => { stop = true; };
   }, [given.id]);
   const [open, setOpen] = useState(!compact);
@@ -82,6 +76,9 @@ export default function JobCard({ job: given, onRetry, compact }: { job: JobView
   const statusLine = <TaskStatus label={stageLabel} startedAt={job.createdAt} endedAt={running ? undefined : job.updatedAt} failed={job.status === "failed" || job.status === "timed_out"} cancelled={job.status === "cancelled"} />;
   const r = job.result ?? {};
   const showContents = canShowJobContents(job);
+  if (job.type === "long_context" && (job.status === "completed" || job.status === "completed_with_warnings") && job.artifacts.length) {
+    return <div className="space-y-3"><div className="flex flex-wrap gap-2">{job.artifacts.map((a) => <ArtifactButton key={a.id} id={a.id} name={a.name} size={fmt(a.size)} />)}</div>{showContents && r.content && <CleanText text={r.content} />}</div>;
+  }
   // File deliveries never expose their contents unless the request opted in.
   if (job.type === "code_export" && (job.status === "completed" || job.status === "completed_with_warnings")) {
     return <div className="space-y-3">
