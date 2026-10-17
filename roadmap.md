@@ -1,5 +1,9 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Backend-only Cloudflare setup
+- [ ] Check whether existing Wrangler backend entrypoint covers chat memory, XLSX jobs, and attachment delivery without the app deployment bundle.
+- [ ] Configure/deploy only the existing backend if supported; otherwise identify the missing backend entrypoint without replacing the live service with an incomplete gateway.
+
 ## Current request — Resume deployment and prove live Excel delivery
 - [x] Deployment audit: dist is ignored/generated, not source; harness output is not available in this sandbox. README/package scripts describe local Vite build then root Wrangler deploy; manual builds and external Cloudflare hosting deployment from this environment are unsupported.
 - [ ] Deploy latest verified code — external blocker: GitHub vision-v9 main lacks both current workbook branch and delivery guard; GitHub Actions API reports zero app workflows. GitHub PAT authentication returns 200 (CLI absent), so authentication is not the blocker. Runtime workflows are separate and cannot deploy app source under project rules.
