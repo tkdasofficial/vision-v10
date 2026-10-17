@@ -2,7 +2,14 @@
 
 ## Current request — Backend-only Cloudflare setup
 - [x] Existing standalone auth-gateway covers OAuth/mail/AI/runtime only, not chat memory, XLSX jobs or attachment APIs; both configs target vision, so deploying that gateway would remove required APIs.
-- [ ] Configure/deploy only the backend — requires separating the full API entrypoint from the combined app server; awaiting user choice before changing that architecture. No live service replaced.
+- [x] Superseded by preview-only scope: do not deploy, separate hosting, or create a new pipeline. No live service replaced.
+
+## Current request — Existing preview backend verification
+- [x] Verified preview proxies APIs to existing vision Worker. Cloudflare read access 200; primary D1 tables and required jobs/artifact/runtime columns present; sandbox six tables present; DB/SANDBOX_DB/AI/SMTP bindings and required secret names present. GitHub runtime workflows accessible and active (200). Drive credentials are Worker secrets, not app_config values.
+- [x] Preserved exact preview URL and infrastructure; no migrations, binding changes, credential copies, deployments or new pipelines. Only scope/memory/roadmap updated; no demonstrated missing schema to repair.
+- [x] Signed-in preview login and /api/jobs returned 200; original prompt and honest job failure restore after reopening; /api/files returned 200 with one indexed file. Focused regression suite: 119 tests passed in 8 files; automatic build OK.
+- [ ] Actual Excel job/download: preview chat job fb85f20a-2c74-4410-8847-9b741942a7b4 incorrectly selected 10-record catalog, then became interrupted after stale recovery; zero registered attachments, no download or workbook validation possible. Active external backend remains d74f493f-b746-4086-9da6-175fd37a2f6d. Current local workbook runner is bypassed by API proxy; activating it locally would violate the Cloudflare-only execution rule. Backend update/development runtime unavailable within current no-deployment scope.
+- [ ] Exact server interruption cause and fresh permanent-memory E2E: captured 296 Worker tail events, all outcome ok with no reported exceptions; POST generation error was not captured, so the underlying cause remains unconfirmed. No blind retry performed. Permanent-memory unit tests passed but fresh UI save/recall not verified in this turn.
 
 ## Current request — Resume deployment and prove live Excel delivery
 - [x] Deployment audit: dist is ignored/generated, not source; harness output is not available in this sandbox. README/package scripts describe local Vite build then root Wrangler deploy; manual builds and external Cloudflare hosting deployment from this environment are unsupported.
