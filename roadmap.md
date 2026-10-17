@@ -1,8 +1,8 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
 ## Current request — Backend-only Cloudflare setup
-- [ ] Check whether existing Wrangler backend entrypoint covers chat memory, XLSX jobs, and attachment delivery without the app deployment bundle.
-- [ ] Configure/deploy only the existing backend if supported; otherwise identify the missing backend entrypoint without replacing the live service with an incomplete gateway.
+- [x] Existing standalone auth-gateway covers OAuth/mail/AI/runtime only, not chat memory, XLSX jobs or attachment APIs; both configs target vision, so deploying that gateway would remove required APIs.
+- [ ] Configure/deploy only the backend — requires separating the full API entrypoint from the combined app server; awaiting user choice before changing that architecture. No live service replaced.
 
 ## Current request — Resume deployment and prove live Excel delivery
 - [x] Deployment audit: dist is ignored/generated, not source; harness output is not available in this sandbox. README/package scripts describe local Vite build then root Wrangler deploy; manual builds and external Cloudflare hosting deployment from this environment are unsupported.
