@@ -1,7 +1,7 @@
 import { act, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-const db = vi.hoisted(() => ({ events: [] as string[], release: (() => {}) as () => void }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "owner" } }) }));
+const db = vi.hoisted(() => ({ user: { id: "owner" }, events: [] as string[], release: (() => {}) as () => void }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: db.user }) }));
 vi.mock("@/lib/idb-cache", () => ({ idbGet: async () => null, idbSet: async () => {}, idbDelete: async () => {}, idbClear: async () => {} }));
 vi.mock("@/lib/cloud/client", () => ({ supabase: { from: (table: string) => ({
   select: () => ({ order: () => ({ limit: async () => ({ data: [], error: null }) }) }),
