@@ -1,5 +1,11 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Restore file results after leaving/reloading
+- [ ] Diagnose missing result against signed-in saved chat and task records.
+- [ ] Repair task restoration and named download controls; add regression coverage.
+- [ ] Verify accepted background task survives leaving/reload and restored file downloads in preview.
+- [ ] Report verified outcome and any external blocker without guaranteeing unlimited Worker lifetime.
+
 ## Current request — Exact Business Performance Excel verification
 - [x] Submitted exact prompt signed-in: chat 901defbe-3d4b-4c39-b755-1fe94d6ba8f5, job 8e861346-fdda-43b1-b66a-51a6f6b4db57 accepted HTTP 200 at 09:15:22 UTC; incorrectly selected 10 records, failed at 09:18:52 as interrupted. Screenshot confirms failed card; main D1 confirms zero artifacts.
 - [x] XLSX download/formulas/reconciliation/rankings/chart validation blocked: no file produced. Sandbox D1 remains generating, one chunk/zero completed, attempt 1, last event chunk_started, error null. Executing older external backend lacks the corrected runner/failure persistence; no recorded underlying exception and no current-code Cloudflare development runtime within no-deployment scope. No blind retry or production changes.
