@@ -25,6 +25,7 @@ import { getCategory } from "@/lib/file-converter";
 import { runJob, listJobs, fetchJob, cancelJob } from "@/lib/builder/jobs-client";
 import { isTerminal } from "@/lib/builder/statuses";
 import { hasDeliveredFile } from "@/lib/builder/file-delivery";
+import { mergeChatJobs } from "@/lib/builder/job-recovery";
 import type { ChatMode } from "@/lib/ai/modes";
 import { saveDocumentFn } from "@/lib/cloud/documents.functions";
 import { useBackgroundTasks, type BackgroundTask } from "@/hooks/useBackgroundTasks";
@@ -57,6 +58,8 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
   // Anything in flight that the send button can stop: a streaming reply and/or backend tasks of this chat.
   const [streaming, setStreaming] = useState(false);
   const [activeJobs, setActiveJobs] = useState<Set<string>>(new Set());
+  const [jobRestoreError, setJobRestoreError] = useState(false);
+  const [jobRestoreAttempt, setJobRestoreAttempt] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const trackJob = useCallback((id: string, running: boolean) => setActiveJobs((cur) => {
     if (cur.has(id) === running) return cur;
@@ -82,7 +85,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
     if (!isIncognito) saveChatMode(browserStore(), chatId, m);
   }, [chatId, isIncognito]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { addChat, updateChatMessages, getChatById } = useChatHistory();
+  const { addChat, updateChatMessages, persistChatMessages, getChatById } = useChatHistory();
   const projectId = chatId ? getChatById(chatId)?.projectId : draftProjectId;
   const { tasks: bgTasks, activeTasks, dispatch: dispatchBgTask } = useBackgroundTasks(chatId);
   const { user } = useAuth();
@@ -275,26 +278,20 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
   useEffect(() => {
     if (isIncognito || !chatId) return;
     let cancelled = false;
-    listJobs(chatId).then((jobs) => {
-      if (cancelled || !jobs.length) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const restore = () => listJobs(chatId).then((jobs) => {
+      if (cancelled) return;
+      setJobRestoreError(false);
       for (const j of jobs) if (!isTerminal(j.status)) trackJob(j.id, true);
-      setMessages((prev) => {
-        const have = new Set(prev.map((m) => m.job?.id).filter(Boolean));
-        const missing = jobs.filter((j) => !have.has(j.id)).map((j): ChatMessageType => ({
-          id: `job-${j.id}`, role: "assistant", timestamp: new Date(j.createdAt), job: j,
-          content: !isTerminal(j.status) ? "" : j.status === "failed" || j.status === "timed_out" ? `That didn't work: ${j.error ?? "unknown error"}` : j.status === "cancelled" ? "Task cancelled." : j.type === "zip_analyze" ? `Analysis of **${j.result?.fileName ?? "your ZIP"}**` : j.type === "project_generate" && hasDeliveredFile(j) ? "Here's your project." : j.type === "agent_task" || j.type === "runtime_task" ? "Here's the result." : hasDeliveredFile(j) ? "Here's your file." : "",
-        }));
-        if (!missing.length) return prev;
-        // A task starts the instant its question is sent, but older chats saved the question a moment later
-        // (after a short save delay), so a task may look slightly older than its own question.
-        // Place each task after the question that triggered it: allow a few seconds of slack.
-        const SLACK = 8000;
-        const key = (m: ChatMessageType) => new Date(m.timestamp).getTime() + (m.job ? SLACK : 0);
-        return [...prev, ...missing].map((m, i) => ({ m, i })).sort((a, b) => key(a.m) - key(b.m) || a.i - b.i).map((x) => x.m);
-      });
-    }).catch(() => undefined);
-    return () => { cancelled = true; };
-  }, [chatId, isIncognito, trackJob]);
+      setMessages((prev) => mergeChatJobs(prev, jobs));
+    }).catch(() => {
+      if (cancelled) return;
+      setJobRestoreError(true);
+      timer = setTimeout(restore, 4000);
+    });
+    void restore();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [chatId, isIncognito, trackJob, jobRestoreAttempt]);
 
   // Follow running tasks so the send button knows when everything has finished.
   useEffect(() => {
@@ -364,6 +361,15 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
       setChatId(newId);
       setChatTitle(title);
       onChatCreated?.(newId);
+    }
+
+    if (sessionId) {
+      try { await persistChatMessages(sessionId, [...messages, userMsg]); }
+      catch (e) {
+        setIsTyping(false);
+        setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: e instanceof Error ? e.message : "Couldn't save this chat. Please try again.", timestamp: new Date() }]);
+        return;
+      }
     }
 
     // Transition from "thinking" to the detected work phase after a delay
@@ -692,6 +698,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
                 isNew={newMessageIds.has(msg.id)}
               />
             ))}
+            {jobRestoreError && <div role="alert" className="mx-auto flex max-w-2xl flex-wrap items-center gap-2 px-3 py-3 text-sm text-muted-foreground"><span>Couldn't load saved results.</span><Button variant="secondary" size="sm" onClick={() => setJobRestoreAttempt((n) => n + 1)}>Try again</Button></div>}
             {isTyping && !messages.some((m) => m.job && !isTerminal(m.job.status)) && <TypingIndicator phase={thinkingPhase} label={taskState ? workStateLabel(workStateForStage(taskState.stage)) : undefined} />}
           </div>
         ) : (
