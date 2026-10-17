@@ -24,6 +24,11 @@ beforeEach(() => { calls.length = 0; handler = ok; });
 afterEach(() => { vi.useRealTimers(); vi.doUnmock("@/lib/cloud/d1.server"); });
 
 describe("rejected D1 operations", () => {
+  it("a zero-row insert never confirms permanent memory was saved", async () => {
+    handler = (sql) => sql.startsWith("INSERT") ? Promise.resolve([]) : ok(sql);
+    const { savePermanentMemory } = await store();
+    expect(await savePermanentMemory("u1", "I live in Kolkata")).toBeNull();
+  });
   it("update (same-subject replace) rejected → null, no success", async () => {
     handler = (sql) => (sql.startsWith("UPDATE") ? Promise.reject(new Error("D1_ERROR")) : ok(sql));
     const { savePermanentMemory } = await store();

@@ -61,7 +61,7 @@ export function buildBusinessSheets(count = 500, year = 2025): Sheet[] {
   top.forEach((p, i) => {
     const r = i + 2;
     dashboard[i + 1] ??= [];
-    dashboard[i + 1][2] = p[0];
+    dashboard[i + 1][2] = { formula: `INDEX(Product_Analysis!$A$2:$A$26,MATCH(${i + 1},Product_Analysis!$F$2:$F$26,0))`, value: String(p[0]) };
     dashboard[i + 1][3] = f(`LARGE(Product_Analysis!$B$2:$B$26,${i + 1})`, val(p[1]));
     // Dynamic product labels follow the same ranked source range.
     const sourceRow = productRows.indexOf(p) + 2;
@@ -87,7 +87,7 @@ function addCharts(bytes: Uint8Array, sheets: Sheet[]): Uint8Array {
   ];
   const drawings: string[] = [];
   specs.forEach((spec, i) => {
-    const source = spec.sheet.rows.slice(1), labels = source.map((r) => spec.sheet.name === "Dashboard" ? String(r[2]) : spec.sheet.name === "Monthly_Trends" ? new Date((val(r[0]) - 25569) * 86400000).toISOString().slice(0, 7) : String(r[0]));
+    const source = spec.sheet.rows.slice(1), labels = source.map((r) => spec.sheet.name === "Dashboard" ? String((r[2] as FormulaCell)?.value ?? r[2]) : spec.sheet.name === "Monthly_Trends" ? new Date((val(r[0]) - 25569) * 86400000).toISOString().slice(0, 7) : String(r[0]));
     const values = source.map((r) => val(r[spec.sheet.name === "Dashboard" ? 3 : 1]));
     const ax1 = 100 + i * 2, ax2 = ax1 + 1;
     const series = `<c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Revenue</c:v></c:tx><c:cat><c:strRef><c:f>'${spec.sheet.name}'!${spec.cat}</c:f><c:strCache><c:ptCount val="${labels.length}"/>${labels.map((s, j) => `<c:pt idx="${j}"><c:v>${escape(s)}</c:v></c:pt>`).join("")}</c:strCache></c:strRef></c:cat><c:val><c:numRef><c:f>'${spec.sheet.name}'!${spec.values}</c:f><c:numCache><c:formatCode>0.00</c:formatCode><c:ptCount val="${values.length}"/>${values.map((v, j) => `<c:pt idx="${j}"><c:v>${v}</c:v></c:pt>`).join("")}</c:numCache></c:numRef></c:val></c:ser>`;

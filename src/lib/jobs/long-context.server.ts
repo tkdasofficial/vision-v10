@@ -71,20 +71,30 @@ export async function runPipeline(userId: string, requestId: string, prompt: str
       for (let attempt = 1; attempt <= CHUNK_ATTEMPTS; attempt++) {
         const claimed = await store.claimChunk(userId, sjob.id, seq, db);
         if (!claimed) break; // completed or owned elsewhere
-        const spec = plan!.chunks[seq];
+        const activePlan = plan;
+        if (!activePlan) throw new Error("Generation plan is missing.");
+        const spec = activePlan.chunks[seq];
+        if (!spec) throw new Error("Generation section is missing.");
         const messages = excel
           ? catalogChunkMessages(prompt, spec.title, batchFor(seq))
-          : gen.chunkMessages(gen.buildChunkContext({ instructions: prompt, outline: plan!.outline, chunk: spec, completed: [], policy: plan!.contextPolicy }), spec.tokenBudget);
+          : gen.chunkMessages(gen.buildChunkContext({ instructions: prompt, outline: activePlan.outline, chunk: spec, completed: [], policy: activePlan.contextPolicy }), spec.tokenBudget);
         const res = await call(messages, excel ? CATALOG_TOKENS : spec.tokenBudget);
         const text = res.ok ? (res.text ?? "").trim() : "";
+        let error = res.ok ? "Empty chunk" : (res.reason ?? "Generation failed");
         if (text) {
-          if (await store.completeChunk(userId, sjob.id, seq, text, gen.estimateTokens(text), db)) break;
+          try {
+            if (excel) {
+              const check = validateCatalog(parseRecords(text).map(normalizeRecord), batchFor(seq));
+              if (!check.ok) throw new Error(check.problems.join("; "));
+            }
+            if (await store.completeChunk(userId, sjob.id, seq, text, gen.estimateTokens(text), db)) break;
+          } catch (e) { error = e instanceof Error ? e.message : "Invalid generated records"; }
         }
-        await store.failChunk(userId, sjob.id, seq, res.ok ? "Empty chunk" : (res.reason ?? "Generation failed"), db);
+        await store.failChunk(userId, sjob.id, seq, error, db);
         if (attempt < CHUNK_ATTEMPTS) await store.markRetryable(userId, sjob.id, db);
       }
       const done = (await store.listChunks(userId, sjob.id, db)).filter((c: any) => c.status === "completed").length;
-      await opts.onProgress?.(done, plan!.chunks.length);
+      await opts.onProgress?.(done, plan.chunks.length);
     });
   }
 
@@ -107,7 +117,7 @@ export async function runPipeline(userId: string, requestId: string, prompt: str
     await store.setJobStatus(userId, sjob.id, ["generating", "assembling"], "completed", {}, db);
     return { sandboxJobId: sjob.id, chunks: plan.chunks.length, text };
   }
-  const rows = final.flatMap((c: any) => parseRecords(c.content!).map(normalizeRecord));
+  const rows = final.flatMap((c: any) => parseRecords(String(c.content ?? "")).map(normalizeRecord));
   const check = validateCatalog(rows, totalRows);
   if (!check.ok) {
     await store.saveOutput(userId, sjob.id, JSON.stringify({ rows: rows.length }), false, check.problems.join("; "), db);
@@ -136,6 +146,23 @@ export function runLongContext(job: JobRun, input: { prompt?: string }, heartbea
   return withJobHeartbeat(job, heartbeatMs, async () => {
     const prompt = input.prompt?.trim();
     if (!prompt) throw new Error("Describe what you want generated.");
+    const { isBusinessWorkbook, writeBusinessWorkbook, businessSalesCsv } = await import("./business-workbook");
+    if (isBusinessWorkbook(prompt)) {
+      const count = Number(prompt.match(/\b(\d{1,4})\s+(?:fictional\s+)?(?:sales\s+)?transactions\b/i)?.[1] ?? 500);
+      const year = Number(prompt.match(/\b(?:19|20)\d{2}\b/)?.[0] ?? 2025);
+      const request = prompt.split("Referenced source —")[0];
+      const csv = /\bCSV\b/i.test(request) && !/\bxlsx\b/i.test(request);
+      await job.step("generating", `Creating ${count} fictional sales transactions and linked summaries`);
+      const bytes = csv ? businessSalesCsv(count, year) : writeBusinessWorkbook(count, year);
+      await job.step("validating", "Checking the workbook structure and calculated values");
+      const { readXlsx } = await import("@/lib/tools/office");
+      if (!csv && readXlsx(bytes)[0]?.rows.length !== count + 1) throw new Error("Sales workbook row validation failed.");
+      await job.step("saving", "Saving the completed file");
+      const fileName = csv ? "Business_Performance_Analysis.csv" : "Business_Performance_Analysis.xlsx";
+      const artifact = await job.saveArtifact(fileName, csv ? "text/csv" : XLSX_MIME, bytes, "file");
+      await job.finish({ prompt, fileName, rows: count, artifactId: artifact.id });
+      return;
+    }
     const { sandboxReady } = await import("@/lib/sandbox/db.server");
     if (!sandboxReady()) throw new Error("The long-context store is unavailable.");
     const excel = wantsWorkbook(prompt);

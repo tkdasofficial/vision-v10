@@ -33,7 +33,7 @@ export function resolveReference(request: string, history: ConvMsg[]): Resolutio
     return long ? { kind: "found", role: "user", ordinal: users.indexOf(long) + 1, index: long.i, id: long.m.id, content: long.text, label: "content you shared above" } : { kind: "missing", label: "content you shared above", reason: "I can't find longer content you shared earlier in this chat." };
   }
   // Ordinal assistant references: "your first response", "the second story", "answer #2", "the last answer".
-  m = new RegExp(`\\b(?:your|the|that)\\s+(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|1st|2nd|3rd|4th|5th|last|latest|previous|earlier|original)\\s+${ASSIST}s?\\b`).exec(t)
+  m = new RegExp(`\\b(?:(?:your|the|that)\\s+)?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|1st|2nd|3rd|4th|5th|last|latest|previous|earlier|original)\\s+${ASSIST}s?\\b`).exec(t)
     ?? new RegExp(`\\b${ASSIST}\\s*(?:#|no\\.?|number)\\s*(\\d{1,3})\\b`).exec(t);
   if (m) {
     const w = m[1];
@@ -53,6 +53,10 @@ export function resolveReference(request: string, history: ConvMsg[]): Resolutio
   if (/\b(previous|last|above|prior)\s+(?:answer|response|reply|one)\b|\bwhere (?:we|you) (?:stopped|left off)\b|\bwhat you (?:just )?(?:said|wrote)\b/.test(t)) return pick(assistants, -1, "assistant", "previous answer");
   // "make a PDF of the story", "export this poem", "convert it to PDF" → the most recent matching content in this chat.
   if (isContentAction(t) && assistants.length) {
+    if (/\b(?:webbook|workbook|spreadsheet)\b/.test(t)) {
+      const workbook = [...assistants].reverse().find((a) => /\bSales_Data\b/i.test(a.text) && /\bRegional_Analysis\b/i.test(a.text));
+      if (workbook) return { kind: "found", role: "assistant", ordinal: assistants.indexOf(workbook) + 1, index: workbook.i, id: workbook.m.id, content: workbook.text, label: "earlier workbook" };
+    }
     const nm = /\b(?:the|that|this|your|above)\s+(story|poem|essay|article|script|letter|report|summary|answer|response|content|text|workbook|webbook|spreadsheet)\b/.exec(t);
     if (nm) {
       const noun = nm[1] === "webbook" ? "workbook" : nm[1];

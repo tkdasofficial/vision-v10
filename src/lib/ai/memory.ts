@@ -26,7 +26,10 @@ const RECALL_RE = /^\s*(?:what|do you)\s+(?:do you\s+)?remember\b|^\s*what did i
 export function detectMemoryRequest(text: string): MemoryRequest {
   const t = text.trim();
   if (!t) return { action: "none" };
+  if (/\b(?:only (?:in|for) (?:this|the current) (?:chat|conversation)|(?:in|for) this (?:chat|conversation) only)\b/i.test(t)) return { action: "none" };
   if (RECALL_RE.test(t)) return { action: "recall" };
+  const explicit = t.match(/^\s*(?:please\s+)?(?:save|store|remember)\s+(?:this\s+)?(?:in|to|as)\s+(?:your\s+|my\s+)?(?:permanent|long[- ]term)\s+memor(?:y|ies)\s*[:—-]\s*(.+)$/is);
+  if (explicit && explicit[1].trim().length >= 2 && explicit[1].trim().length <= 500) return { action: "save", content: explicit[1].trim() };
   const m = t.match(SAVE_RE);
   if (m && m[1].trim().length >= 2 && m[1].trim().length <= 500) return { action: "save", content: m[1].trim() };
   return { action: "none" };
@@ -39,7 +42,7 @@ export function detectMemoryRequest(text: string): MemoryRequest {
 export function relevantMemories(memories: PermanentMemory[], text: string, budget = 1500): PermanentMemory[] {
   const queryWords = new Set(words(text));
   const scored = memories
-    .map((m) => ({ m, hits: words(m.content).filter((w) => queryWords.has(w)).length }))
+    .map((m) => ({ m, hits: words(m.content).filter((w) => queryWords.has(w)).length + (/\b(?:i prefer|please always|always|never|from now on)\b/i.test(m.content) ? 1 : 0) }))
     .filter((s) => s.hits > 0)
     .sort((a, b) => b.hits - a.hits || b.m.createdAt - a.m.createdAt);
   const out: PermanentMemory[] = [];
@@ -111,11 +114,12 @@ export function detectMemoryCommand(text: string): MemoryCommand {
 }
 
 const STOP = new Set(["the", "that", "this", "and", "about", "you", "your", "are", "was", "for", "with", "from", "memory", "remember", "please", "what", "have"]);
-const words = (s: string) => (s.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !STOP.has(w));
+const ALIASES: Record<string, string> = { favourite: "favorite", colour: "color", shade: "color", hometown: "city", concise: "brief", brevity: "brief" };
+const words = (s: string) => (s.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []).filter((w) => !STOP.has(w)).map((w) => ALIASES[w] ?? w);
 
 /** Subject of a fact ("my favorite color is teal" → "my favorite color"), used to detect conflicts. */
 export function memorySubject(content: string): string | null {
-  const c = content.toLowerCase().replace(/[.!]+$/, "").trim();
+  const c = content.toLowerCase().replace(/\bfavourite\b/g, "favorite").replace(/\bcolour\b/g, "color").replace(/[.!]+$/, "").trim();
   const m = c.match(/^(.{3,60}?)\s+(?:is|are|=)\s+.+$/) ?? c.match(/^(i (?:live in|work at|work as|am based in|prefer)|call me)\s+.+$/);
   return m ? m[1].replace(/\s+/g, " ").trim() : null;
 }
