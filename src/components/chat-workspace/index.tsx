@@ -85,7 +85,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
     if (!isIncognito) saveChatMode(browserStore(), chatId, m);
   }, [chatId, isIncognito]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { addChat, updateChatMessages, getChatById } = useChatHistory();
+  const { addChat, updateChatMessages, persistChatMessages, getChatById } = useChatHistory();
   const projectId = chatId ? getChatById(chatId)?.projectId : draftProjectId;
   const { tasks: bgTasks, activeTasks, dispatch: dispatchBgTask } = useBackgroundTasks(chatId);
   const { user } = useAuth();
@@ -361,6 +361,15 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
       setChatId(newId);
       setChatTitle(title);
       onChatCreated?.(newId);
+    }
+
+    if (sessionId) {
+      try { await persistChatMessages(sessionId, [...messages, userMsg]); }
+      catch (e) {
+        setIsTyping(false);
+        setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: e instanceof Error ? e.message : "Couldn't save this chat. Please try again.", timestamp: new Date() }]);
+        return;
+      }
     }
 
     // Transition from "thinking" to the detected work phase after a delay

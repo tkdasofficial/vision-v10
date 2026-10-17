@@ -24,6 +24,7 @@ type ChatHistoryContextType = {
   deleteChat: (id: string) => void;
   searchHistory: (query: string) => ChatHistoryItem[];
   updateChatMessages: (id: string, messages: ChatMessage[]) => void;
+  persistChatMessages: (id: string, messages: ChatMessage[]) => Promise<void>;
   getChatById: (id: string) => ChatHistoryItem | undefined;
   loadChatMessages: (id: string) => Promise<ChatMessage[]>;
   setChatProject: (id: string, projectId: string | null) => Promise<boolean>;
@@ -156,6 +157,7 @@ export const ChatHistoryProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const prevUserRef = useRef<string | null>(null);
+  const sessionWrites = useRef(new Map<string, Promise<void>>());
 
   // Sync history to localStorage whenever it changes
   useEffect(() => {
@@ -257,7 +259,7 @@ export const ChatHistoryProvider = ({ children }: { children: ReactNode }) => {
 
     // Persist to Supabase in background
     if (user) {
-      supabase
+      const write = Promise.resolve(supabase
         .from("chat_sessions")
         .insert({
           id: tempId,
@@ -267,9 +269,11 @@ export const ChatHistoryProvider = ({ children }: { children: ReactNode }) => {
           tool_id: toolId || null,
           project_id: projectId,
         })
-        .then(({ error }) => {
-          if (error) console.error("Failed to save chat session:", error);
+        ).then(({ error }) => {
+          if (error) throw new Error("Couldn't save this chat. Please try again.");
         });
+      sessionWrites.current.set(tempId, write);
+      void write.catch(() => {});
     }
 
     return tempId;
@@ -327,6 +331,24 @@ export const ChatHistoryProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const savedRef = useRef(new Map<string, string>());
+  // Before dispatching background work, commit its question and session. A page can close before
+  // the ordinary debounced save fires, but the accepted task must have a durable conversation.
+  const persistChatMessages = useCallback(async (id: string, messages: ChatMessage[]) => {
+    await sessionWrites.current.get(id);
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const pending = messages.filter((m) => m.content && !m.job && savedRef.current.get(m.id) !== m.content);
+    if (!pending.length) return;
+    let last = 0;
+    const rows = pending.map((m) => {
+      last = Math.max(last + 1, new Date(m.timestamp).getTime() || Date.now());
+      return { id: UUID.test(m.id) ? m.id : stableRowId(id, m.id), session_id: id, role: m.role, content: m.content,
+        created_at: new Date(last).toISOString(), image_url: m.imageUrl || null, metadata: buildMetadata(m) };
+    });
+    const { error } = await supabase.from("chat_messages").upsert(rows, { onConflict: "id" });
+    if (error) throw new Error("Couldn't save your message. Please try again.");
+    pending.forEach((m) => savedRef.current.set(m.id, m.content));
+    lsSetMessages(id, messages.filter((m) => !m.job));
+  }, []);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const pendingRows = useRef<Record<string, Map<string, { row: any; msg: ChatMessage }>>>({});
   const updateChatMessages = useCallback((id: string, messages: ChatMessage[]) => {
@@ -396,6 +418,7 @@ export const ChatHistoryProvider = ({ children }: { children: ReactNode }) => {
         deleteChat,
         searchHistory,
         updateChatMessages,
+        persistChatMessages,
         getChatById,
         loadChatMessages,
         setChatProject,
@@ -415,6 +438,7 @@ const FALLBACK_HISTORY: ChatHistoryContextType = {
   deleteChat: () => {},
   searchHistory: () => [],
   updateChatMessages: () => {},
+  persistChatMessages: async () => {},
   getChatById: () => undefined,
   loadChatMessages: async () => [],
   setChatProject: async () => false,
