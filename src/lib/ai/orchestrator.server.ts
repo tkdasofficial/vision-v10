@@ -9,7 +9,10 @@ export type ProviderEvent = { stage: "retrying" | "switching_provider"; provider
 export type ProviderPolicy = "fallback" | "input" | "cancelled";
 export function providerPolicy(status: number, reason: string): ProviderPolicy {
   if (status === 499) return "cancelled";
-  if (status === 400 || status === 413 || status === 422) return "input";
+  // 413 is provider-specific (each provider has its own payload limit), so the chain
+  // falls through to the next provider; it only becomes an input error if every
+  // provider rejects the payload (handled in orchestrateText).
+  if (status === 400 || status === 422) return "input";
   // A provider credential failure is not an app-user authorization failure (checked before calling here).
   if (status === 403 && /content.?policy|safety|refusal/i.test(reason)) return "input";
   return "fallback";
