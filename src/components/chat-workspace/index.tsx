@@ -59,7 +59,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
   // Anything in flight that the send button can stop: a streaming reply and/or backend tasks of this chat.
   const [streaming, setStreaming] = useState(false);
   const [activeJobs, setActiveJobs] = useState<Set<string>>(new Set());
-  const [jobRestoreError, setJobRestoreError] = useState(false);
+  const [jobRestoreError, setJobRestoreError] = useState<string | null>(null);
   const [jobRestoreAttempt, setJobRestoreAttempt] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const trackJob = useCallback((id: string, running: boolean) => setActiveJobs((cur) => {
@@ -302,16 +302,17 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
   // Restore this conversation's backend tasks (after a refresh or when the chat gets its own address).
   useEffect(() => {
     if (isIncognito || !chatId) return;
+    setJobRestoreError(null);
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const restore = () => listJobs(chatId).then((jobs) => {
       if (cancelled) return;
-      setJobRestoreError(false);
+      setJobRestoreError(null);
       for (const j of jobs) if (!isTerminal(j.status)) trackJob(j.id, true);
       setMessages((prev) => mergeChatJobs(prev, jobs));
-    }).catch(() => {
+    }).catch((error: unknown) => {
       if (cancelled) return;
-      setJobRestoreError(true);
+      setJobRestoreError(error instanceof Error ? error.message : "Please check your connection and try again.");
       timer = setTimeout(restore, 4000);
     });
     void restore();
@@ -733,7 +734,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
                 onReport={isIncognito ? undefined : handleReportReply}
               />
             ))}
-            {jobRestoreError && <div role="alert" className="mx-auto flex max-w-2xl flex-wrap items-center gap-2 px-3 py-3 text-sm text-muted-foreground"><span>Couldn't load saved results.</span><Button variant="secondary" size="sm" onClick={() => setJobRestoreAttempt((n) => n + 1)}>Try again</Button></div>}
+            {jobRestoreError && <div role="alert" className="mx-auto flex max-w-2xl flex-wrap items-center gap-2 px-3 py-3 text-sm text-muted-foreground"><span>Couldn't load saved results. {jobRestoreError}</span><Button variant="secondary" size="sm" onClick={() => setJobRestoreAttempt((n) => n + 1)}>Try again</Button></div>}
             {isTyping && !messages.some((m) => m.job && !isTerminal(m.job.status)) && <TypingIndicator phase={thinkingPhase} label={taskState ? workStateLabel(workStateForStage(taskState.stage)) : undefined} />}
           </div>
         ) : (

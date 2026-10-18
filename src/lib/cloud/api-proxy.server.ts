@@ -3,7 +3,7 @@
 // where the D1 binding, Workers AI binding and provider secrets live. With API_ORIGIN set
 // (the Worker's public URL, e.g. https://vision-app.<account>.workers.dev), every /api/*
 // handler forwards the request there and streams the response back. On the Worker itself
-// (DB/AI binding present) or without API_ORIGIN, requests are handled locally.
+// (DB/AI binding present), requests stay local; other hosts use the shared backend by default.
 
 import { getD1Binding, getAiBinding, getSecret } from "@/lib/ai/runtime-env.server";
 import { DEVELOPMENT_API_ORIGIN } from "@/lib/backend-config";
@@ -67,6 +67,9 @@ export async function maybeProxyToWorker(request: Request): Promise<Response | n
   headers.set("origin", apiOrigin);
   headers.set("referer", `${apiOrigin}/`);
   headers.set("x-forwarded-host", incoming.host);
+  // fetch may decode upstream bytes while retaining the compression header.
+  // Plain bytes avoid a second decompression by the browser for JSON/SSE/downloads.
+  headers.set("accept-encoding", "identity");
 
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
   try {
@@ -81,7 +84,7 @@ export async function maybeProxyToWorker(request: Request): Promise<Response | n
     const responseHeaders = new Headers();
     for (const [name, value] of upstream.headers) {
       const key = name.toLowerCase();
-      if (HOP_BY_HOP.has(key) || key === "set-cookie") continue;
+      if (HOP_BY_HOP.has(key) || key === "set-cookie" || key === "content-encoding") continue;
       responseHeaders.set(name, value);
     }
     // Session cookies from the Worker must be re-scoped to this origin.

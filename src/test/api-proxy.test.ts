@@ -79,6 +79,23 @@ describe("api-proxy", () => {
     expect(res!.status).toBe(403);
   });
 
+  it.each(["br", "gzip"])("does not label decoded saved results as %s compressed", async (encoding) => {
+    const realFetch = globalThis.fetch;
+    let requestedEncoding: string | null = null;
+    globalThis.fetch = (async (_url: unknown, init: RequestInit) => {
+      requestedEncoding = new Headers(init.headers).get("accept-encoding");
+      return new Response(JSON.stringify({ jobs: [{ id: "saved-job" }] }), {
+        headers: { "content-type": "application/json", "content-encoding": encoding },
+      });
+    }) as typeof fetch;
+    try {
+      const res = await maybeProxyToWorker(req("/api/jobs?session=saved-chat", { headers: { "accept-encoding": "gzip, deflate, br" } }));
+      expect(requestedEncoding).toBe("identity");
+      expect(res?.headers.get("content-encoding")).toBeNull();
+      expect(await res?.json()).toEqual({ jobs: [{ id: "saved-job" }] });
+    } finally { globalThis.fetch = realFetch; }
+  });
+
   it("returns 502 when the Worker is unreachable", async () => {
     const realFetch = globalThis.fetch;
     globalThis.fetch = (async () => { throw new Error("connect refused"); }) as any;
