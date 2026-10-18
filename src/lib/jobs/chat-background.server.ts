@@ -2,9 +2,10 @@
 // and the finished answer is written to the user's chat so it is there when they come back.
 
 type Lifetime = (promise: Promise<unknown>) => void;
+const WORKER_MODULE = "cloudflare:workers";
 /** Resolve the request-scoped runtime BEFORE starting work or returning a response. */
 export async function prepareKeepAlive(
-  load: () => Promise<{ waitUntil?: Lifetime }> = () => import(/* @vite-ignore */ "cloudflare:workers" as string),
+  load: () => Promise<{ waitUntil?: Lifetime }> = () => import(/* @vite-ignore */ WORKER_MODULE),
 ): Promise<Lifetime> {
   try {
     const runtime = await load();
