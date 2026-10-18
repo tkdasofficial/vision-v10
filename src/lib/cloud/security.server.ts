@@ -10,9 +10,12 @@ export const DEVICE_COOKIE = "vision_did";
 
 /** Keyed hashing so stored identifiers are pseudonymous. */
 async function hashKey(): Promise<string> {
-  const explicit = process.env["SECURITY_HASH_KEY"];
+  const { getSecret } = await import("@/lib/ai/runtime-env.server");
+  const explicit = getSecret("SECURITY_HASH_KEY");
   if (explicit) return explicit;
-  const token = process.env["CLOUDFLARE_API_TOKEN"];
+  // Worker bindings are not visible through process.env; read them via getSecret.
+  // SIGNING_KEY is an existing Worker secret and stays stable, so pseudonyms don't change.
+  const token = getSecret("CLOUDFLARE_API_TOKEN") ?? getSecret("SIGNING_KEY");
   if (!token) throw new Error("Security is not configured");
   return sha256Hex(`vision-security:${token}`);
 }
