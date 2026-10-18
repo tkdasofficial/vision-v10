@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { encode } from "gpt-tokenizer/encoding/o200k_harmony";
 import type { ChatMsg } from "./pipeline";
 
 const id = z.string().min(1);
@@ -326,7 +325,9 @@ export type StoryAdapter = {
   tokenization: string;
   countTokens(text: string): number;
 };
-/** Portable BPE estimate with UTF-8 byte upper bound when the provider tokenizer is not available. */
+/** Fast conservative token estimate (chars/3 overestimates, so budget checks stay safe).
+ *  A pure-JS BPE tokenizer was removed: encoding every large story context burned the
+ *  Worker's CPU budget and killed long story runs with "Worker exceeded CPU time limit". */
 export function storyAdapter(model: string, provider: string): StoryAdapter {
   const gpt = /gpt-oss/.test(model);
   // Published provider context limits; output remains the existing configured 8k allowance.
@@ -339,10 +340,8 @@ export function storyAdapter(model: string, provider: string): StoryAdapter {
     outputTokens: 8192,
     headroomTokens: 2048,
     schemaMode: "normalized-json",
-    tokenization: gpt
-      ? "o200k_harmony BPE estimate (not provider usage)"
-      : "UTF-8 byte upper bound; native tokenizer unavailable",
-    countTokens: gpt ? (s) => encode(s).length : (s) => new TextEncoder().encode(s).length,
+    tokenization: "chars/3 conservative estimate (not provider usage)",
+    countTokens: (s) => Math.ceil(s.length / 3),
   };
 }
 export function budgetStoryMessages(

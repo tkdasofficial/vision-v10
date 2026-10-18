@@ -204,6 +204,10 @@ export const Route = createFileRoute("/api/chat")({
           const { runDeepPipeline } = await import("@/lib/ai/deep/pipeline");
           const { collectStream, sseChunk, sseDone, sseComment, sseStatus } = await import("@/lib/ai/deep/sse");
           const models = candidatesFor(task);
+          // Deep/story calls: Nemotron Super streams minutes of <think> reasoning as content and
+          // never finishes large prompts within the deadline (observed 4/4 runs), burning the
+          // Worker's CPU budget before fallbacks can run — deep calls lead with Groq instead.
+          const deepModels = [...models].sort((a, b) => (a.provider === "nvidia" ? 1 : 0) - (b.provider === "nvidia" ? 1 : 0));
           let usedModel = "";
           let providerProgress: ((stage: string, detail?: string) => void) | undefined;
           const callWith = (order: typeof models) => async (msgs: unknown[]) => {
@@ -213,9 +217,9 @@ export const Route = createFileRoute("/api/chat")({
             usedModel = result.model.label;
             return { ok: true as const, text: result.text, finishReason: result.finishReason, model: result.model.model, provider: result.model.provider };
           };
-          const call = callWith(models);
+          const call = callWith(deepModels);
           // Review still uses an independent model, but its provider priority remains sequential.
-          const reviewCall = callWith(models.map((model) => model.provider === "nvidia" ? { ...model, model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni" } : model));
+          const reviewCall = callWith(deepModels.map((model) => model.provider === "nvidia" ? { ...model, model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni" } : model));
           const requestId = typeof body?.requestId === "string" && /^[\w-]{8,64}$/.test(body.requestId) ? body.requestId : crypto.randomUUID();
           const conversationId = typeof body?.conversationId === "string" ? body.conversationId.slice(0, 64) : undefined;
           const stream = new ReadableStream<Uint8Array>({
@@ -250,14 +254,14 @@ export const Route = createFileRoute("/api/chat")({
                 progress("analyzing");
                 const { storyAdapter, budgetStoryMessages } = await import("@/lib/ai/deep/story");
                 const { d1StoryStore } = await import("@/lib/ai/deep/story-store.server");
-                const adapter = storyAdapter(models[0]?.model ?? "unknown", models[0]?.provider ?? "unknown");
+                const adapter = storyAdapter(deepModels[0]?.model ?? "unknown", deepModels[0]?.provider ?? "unknown");
                 const storyCall = (order: typeof models) => async (msgs: import("@/lib/ai/deep/pipeline").ChatMsg[]) => {
                   try {
                     for (const model of order) budgetStoryMessages(msgs, storyAdapter(model.model, model.provider));
                     return await callWith(order)(msgs);
                   } catch (e) { return { ok: false as const, status: 413, reason: e instanceof Error ? e.message : "Required story context exceeds token budget" }; }
                 };
-                const res = await runDeepPipeline({ messages: fullMessages as any, analysis: deepAnalysis, call: /^(scene|chapter|shot|panel|episode|beat)s?$/i.test(deepAnalysis.items?.noun ?? "") ? storyCall(models) : call, fallbackCall: reviewCall, request: lastText, plan: deepAnalysis.complex || lastText.length > 400, review: true, progress, story: { requestId, adapter, store: d1StoryStore(caller.user.id), reviewCall: storyCall(models.map((m) => m.provider === "nvidia" ? { ...m, model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning" } : m)) } });
+                const res = await runDeepPipeline({ messages: fullMessages as any, analysis: deepAnalysis, call: /^(scene|chapter|shot|panel|episode|beat)s?$/i.test(deepAnalysis.items?.noun ?? "") ? storyCall(deepModels) : call, fallbackCall: reviewCall, request: lastText, plan: deepAnalysis.complex || lastText.length > 400, review: true, progress, story: { requestId, adapter, store: d1StoryStore(caller.user.id), reviewCall: storyCall(deepModels.map((m) => m.provider === "nvidia" ? { ...m, model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning" } : m)) } });
                 console.log("[chat:deep]", JSON.stringify({ user: caller.user.id, model: usedModel, ok: res.ok, stages: res.stages, corrections: res.ok ? res.corrections : 0, remaining: res.ok ? res.remaining.length : null, ms: Date.now() - t0 }));
                 if (res.ok) {
                   await saveReply(caller.user.id, chatId, requestId, res.text, { executionMode: task.executionMode });
