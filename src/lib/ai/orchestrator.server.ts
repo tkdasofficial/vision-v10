@@ -54,10 +54,15 @@ export async function orchestrateText(messages: unknown[], opts: {
       status = result.status;
       category = failureCategory(status, result.reason);
       const policy = providerPolicy(status, result.reason);
-      if (policy !== "fallback") return { ok: false, status, reason: policy === "cancelled" ? "Request cancelled." : "The AI request is invalid or unsupported. Please check the input and required format." };
+      if (policy === "cancelled") return { ok: false, status, reason: "Request cancelled." };
+      // A provider-specific payload limit (413) must not kill the chain: another provider may
+      // accept the same request. Only when no provider succeeds do we surface the input error.
+      if (policy === "input" && status !== 413) return { ok: false, status, reason: "The AI request is invalid or unsupported. Please check the input and required format." };
+      if (status === 413) inputRejected = { status, reason: result.reason };
     }
     console.log(JSON.stringify({ tag: "[ai:orchestration]", taskId: opts.taskId, provider: model.provider, model: model.model, attempt: i + 1, outcome: "fallback", status, category, ms: Date.now() - started }));
   }
   console.log(JSON.stringify({ tag: "[ai:orchestration]", taskId: opts.taskId, outcome: "exhausted" }));
+  if (inputRejected) return { ok: false, status: 413, reason: "The request is too large for the available AI providers. Please shorten it or split it into smaller parts." };
   return { ok: false, status: 503, reason: ALL_PROVIDERS_UNAVAILABLE };
 }
