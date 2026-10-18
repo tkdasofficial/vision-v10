@@ -284,7 +284,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
   }, [chatId, user, isIncognito]);
 
   /** Runs a backend job and keeps one assistant message in this chat updated with its live status. */
-  const runInlineJob = useCallback(async (type: "project_generate" | "code_export" | "agent_task" | "long_context", input: Record<string, unknown>, sessionId: string | null, files?: File[]) => {
+  const runInlineJob = useCallback(async (type: "project_generate" | "code_export" | "agent_task" | "long_context" | "runtime_task", input: Record<string, unknown>, sessionId: string | null, files?: File[]) => {
     const jobId = crypto.randomUUID();
     const msgId = `job-${jobId}`;
     const done = type === "project_generate" ? "Here's your project." : type === "code_export" || type === "long_context" ? "Here's your file." : "";
@@ -432,7 +432,8 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
         return;
       }
       const src = ref.kind === "found" ? `\n\n${sourceBlock(ref)}` : "";
-      if (route.kind === "long_context") await runInlineJob("long_context", { prompt: content + src }, sessionId);
+      if (route.kind === "story") await runInlineJob("runtime_task", { operation: "story_generate", params: { prompt: content + src } }, sessionId);
+      else if (route.kind === "long_context") await runInlineJob("long_context", { prompt: content + src }, sessionId);
       else if (route.kind === "tool") await runInlineJob("agent_task", { prompt: content + src }, sessionId);
       else if (route.kind === "project") await runInlineJob("project_generate", { prompt: content + src }, sessionId);
       else if (route.kind === "code_export") await runInlineJob("code_export", { prompt: content + src, language: route.language }, sessionId);

@@ -3,7 +3,7 @@
 
 export const MB = 1024 * 1024;
 import { FORMAT_BY_ID, formatOfName, routeConversion, canonicalId, matchesSignature } from "@/lib/formats/inventory";
-export type RuntimeOpId = "checksum" | "image_convert" | "video_convert" | "audio_convert" | "office_convert" | "data_convert" | "archive_convert" | "ebook_convert" | "font_convert" | "render";
+export type RuntimeOpId = "checksum" | "image_convert" | "video_convert" | "audio_convert" | "office_convert" | "data_convert" | "archive_convert" | "ebook_convert" | "font_convert" | "render" | "story_generate";
 
 export type RuntimeOp = { id: RuntimeOpId; label: string; maxInput: number; maxOutput: number; timeoutMs: number; targets?: readonly string[] };
 
@@ -18,6 +18,8 @@ export const RUNTIME_OPS: Record<RuntimeOpId, RuntimeOp> = {
   ebook_convert: { id: "ebook_convert", label: "E-book conversion", maxInput: 25 * MB, maxOutput: 60 * MB, timeoutMs: 15 * 60_000, targets: ["epub", "pdf", "txt", "mobi", "azw3", "fb2", "docx", "html"] },
   font_convert: { id: "font_convert", label: "Font conversion", maxInput: 25 * MB, maxOutput: 30 * MB, timeoutMs: 5 * 60_000, targets: ["ttf", "otf", "woff", "woff2"] },
   render: { id: "render", label: "Diagram/TeX rendering", maxInput: 5 * MB, maxOutput: 30 * MB, timeoutMs: 10 * 60_000, targets: ["svg", "png", "pdf"] },
+  // Prompt-only operation (no input file): the runner writes the full story as a Markdown document.
+  story_generate: { id: "story_generate", label: "Story generation", maxInput: 0, maxOutput: 5 * MB, timeoutMs: 40 * 60_000 },
 };
 /** Source formats each runtime op accepts (sent as params.source because the runner sees only bytes). */
 export const RUNTIME_SOURCES: Partial<Record<RuntimeOpId, readonly string[]>> = {
@@ -123,6 +125,10 @@ export function detectRuntimeOp(prompt: string, files: { name: string; mime: str
 
 /** Validates params for an operation; only known keys and values survive. */
 export function cleanParams(op: RuntimeOpId, params: any): Record<string, unknown> {
+  if (op === "story_generate") {
+    const prompt = typeof params?.prompt === "string" ? params.prompt : "";
+    return { prompt };
+  }
   if (op === "checksum") {
     const algorithms = (Array.isArray(params?.algorithms) ? params.algorithms : ["sha256"]).filter((a: unknown) => a === "sha256" || a === "sha512");
     const expected = typeof params?.expected === "string" && /^([0-9a-f]{64}|[0-9a-f]{128})$/.test(params.expected) ? params.expected : undefined;

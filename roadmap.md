@@ -147,3 +147,15 @@ Spec: user-uploaded VISION memory/output/artifact/activity integration doc (5 ta
 - [x] In-chat workbook delivery — live older Worker interrupted the task; independently verified workbook delivered in Files, full signed-in download flow remains unverified.
 
 - Root cause of failed Excel run: Cloudflare Worker ran old code (10-record catalog path). Fixed by packaging in /tmp and `npx wrangler deploy` → version ae7052d8. Re-run job 9710277d completed; 500 rows, 5 sheets, 3 charts, 1,745 formulas, 0 errors after recalculation.
+
+## Current request — Hybrid Execution PRD: story tasks on GitHub Actions runtime
+- [ ] Add `story_generate` op to vision-runtime (blueprint → N scenes → validate/retry → assemble; NVIDIA Nemotron primary, Groq GPT-OSS 120B fallback via repo secrets; checkpointed progress via relay).
+- [ ] App: register op in operations.ts; no-input support in runtime.server.ts; story stages in relay; /api/chat routes story requests to runtime dispatch; finalize saves markdown artifact + chat reply.
+- [ ] github.server.ts reads GITHUB_PAT via getSecret; install GITHUB_PAT Worker secret (value never printed).
+- [ ] run-job.yml: add story_generate choice + provider secrets env for that op only.
+- [ ] Tests (app + runtime repo), deploy Worker, push runtime repo, verify real 10-scene story end-to-end.
+- [x] story_generate op added to vision-runtime (blueprint→scenes→validate/retry→assemble; NVIDIA→Groq; checkpointed); pushed to GitHub via API; 20 runtime tests pass.
+- [x] App: story_generate registered (no-input), story stages in relay, /api/jobs JSON path, request-route kind "story", chat-workspace dispatches runtime_task; finalize saves Drive artifact + full story as chat reply. GITHUB_PAT installed as Worker secret; github.server.ts uses getSecret. Full suite 1,482 passed.
+- [x] Fixed login blocker: security hash key now reads Worker secrets via getSecret with SIGNING_KEY fallback ("Security is not configured" gone; password step verified).
+- [x] Worker deployed: 960630d3-beb1-4635-a2dd-6524aadeda51.
+- [ ] End-to-end: signed-in 10-scene story run in progress at wrap-up; confirm completion + chat reply + download next turn.

@@ -7,7 +7,8 @@ const WORKFLOW = "run-job.yml";
 export class GithubError extends Error { constructor(msg: string, public status: number) { super(msg); } }
 
 async function gh(path: string, init: RequestInit = {}, tries = 3): Promise<Response> {
-  const token = process.env["GITHUB_PAT"];
+  const { getSecret } = await import("@/lib/ai/runtime-env.server");
+  const token = getSecret("GITHUB_PAT");
   if (!token) throw new GithubError("Background runtime is not configured (GitHub access key missing in Cloudflare).", 503);
   let last: Response | null = null;
   for (let i = 0; i < tries; i++) {

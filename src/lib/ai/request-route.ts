@@ -8,6 +8,7 @@ export type RequestRoute =
   | { kind: "long_context" }
   | { kind: "project" }
   | { kind: "code_export"; language: string }
+  | { kind: "story" }
   | { kind: "file"; format: string };
 
 /** Long pasted briefs are instructions for a written answer, not one-word tool triggers. */
@@ -50,6 +51,11 @@ export function routeRequest(content: string, mode: ChatMode = "default"): Reque
     return CODE_FORMATS.includes(f) ? { kind: "code_export", language: f } : { kind: "file", format: f };
   }
   if (excel) return { kind: "file", format: "xlsx" };
+  // Multi-scene story/prompt generation runs on the background runtime (it exceeds the
+  // front-end Workers CPU budget): a counted set of scenes/chapters/episodes for a story.
+  if (/\b\d{1,2}\s*(?:detailed\s*|sequential\s*|separate\s*|distinct\s*|,\s*)*\b(?:scene|chapter|episode|part)s?\b/i.test(content)
+    && /\b(?:story|scene[- ]generation\s+prompts?|screenplay|narrative)\b/i.test(content)
+    && /\b(?:generate|write|create|produce|craft|develop)\b/i.test(content)) return { kind: "story" };
   return { kind: "chat" };
 }
 

@@ -16,29 +16,40 @@ async function sha256Hex(bytes: Uint8Array) {
 export async function startRuntimeJob(job: JobRun, input: RuntimeInput): Promise<void> {
   const op = RUNTIME_OPS[input.operation];
   if (!op) throw new Error("Operation is not permitted.");
-  await job.step("validating", "Validating the request and file");
+  await job.step("validating", "Validating the request");
   const params = cleanParams(op.id, input.params);
-  if (!input.bytes?.length) throw new Error("The file is empty.");
-  if (input.bytes.length > op.maxInput) throw new Error(`Files up to ${op.maxInput / 1024 / 1024} MB are supported for this task.`);
+  const noInput = op.maxInput === 0;
+  if (noInput) {
+    const prompt = typeof params.prompt === "string" ? params.prompt.trim() : "";
+    if (!prompt || prompt.length > 60_000) throw new Error("The story brief is missing or too large.");
+    params.prompt = prompt;
+  } else {
+    if (!input.bytes?.length) throw new Error("The file is empty.");
+    if (input.bytes.length > op.maxInput) throw new Error(`Files up to ${op.maxInput / 1024 / 1024} MB are supported for this task.`);
+  }
 
   const active = await d1<{ mine: number; all: number }>(
     "SELECT SUM(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS mine, COUNT(*) AS \"all\" FROM runtime_jobs WHERE status IN ('queued','dispatched','running','uploaded','finalizing')", [job.userId]);
   if ((active[0]?.mine ?? 0) >= RUNTIME_LIMITS.perUserActive) throw new Error(`You already have ${RUNTIME_LIMITS.perUserActive} background tasks running. Wait for one to finish.`);
   if ((active[0]?.all ?? 0) >= RUNTIME_LIMITS.globalActive) throw new Error("The background runtime is busy right now. Please try again in a few minutes.");
 
-  await job.step("uploading", "Storing the file privately for the runner");
-  const { putD1Artifact } = await import("@/lib/jobs/artifact-store.server");
-  const { key, chunks } = await putD1Artifact(input.bytes);
-  const hash = await sha256Hex(input.bytes);
-  // Keep a source record so the task can be retried without re-uploading.
-  const srcId = crypto.randomUUID();
-  await d1("INSERT INTO job_artifacts (id, job_id, user_id, name, mime, size, sha256, drive_file_id, kind, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'source', ?, ?)",
-    [srcId, job.id, job.userId, input.fileName, input.mime, input.bytes.length, hash, key, new Date(Date.now() + ARTIFACT_TTL_MS).toISOString(), now()]);
+  let key: string | null = null, chunks = 0, hash: string | null = null, srcId: string | null = null;
+  if (!noInput) {
+    await job.step("uploading", "Storing the file privately for the runner");
+    const { putD1Artifact } = await import("@/lib/jobs/artifact-store.server");
+    const stored = await putD1Artifact(input.bytes);
+    key = stored.key; chunks = stored.chunks;
+    hash = await sha256Hex(input.bytes);
+    // Keep a source record so the task can be retried without re-uploading.
+    srcId = crypto.randomUUID();
+    await d1("INSERT INTO job_artifacts (id, job_id, user_id, name, mime, size, sha256, drive_file_id, kind, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'source', ?, ?)",
+      [srcId, job.id, job.userId, input.fileName, input.mime, input.bytes.length, hash, key, new Date(Date.now() + ARTIFACT_TTL_MS).toISOString(), now()]);
+  }
   await d1("UPDATE jobs SET input = ? WHERE id = ?", [JSON.stringify({ operation: op.id, params, fileName: input.fileName, mime: input.mime, sourceArtifactId: srcId }), job.id]);
 
   const deadline = new Date(Date.now() + op.timeoutMs + RUNTIME_LIMITS.queueGraceMs).toISOString();
   await d1("INSERT INTO runtime_jobs (job_id, user_id, operation, params, input_key, input_name, input_mime, input_size, input_sha256, input_chunks, status, deadline, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)",
-    [job.id, job.userId, op.id, JSON.stringify(params), key, input.fileName, input.mime, input.bytes.length, hash, chunks, deadline, now(), now()]);
+    [job.id, job.userId, op.id, JSON.stringify(params), key, noInput ? null : input.fileName, noInput ? null : input.mime, noInput ? null : input.bytes.length, hash, chunks, deadline, now(), now()]);
 
   // Duplicate protection: only the request that flips queued → dispatched may call GitHub.
   const won = await d1("UPDATE runtime_jobs SET status = 'dispatched', dispatched_at = ?, updated_at = ? WHERE job_id = ? AND status = 'queued' RETURNING job_id", [now(), now(), job.id]);
@@ -61,7 +72,17 @@ const STAGE_STEP: Record<string, ["running" | "validating" | "processing" | "ver
   processing: ["processing", "Processing the file"],
   validating_output: ["verifying", "Validating the output"],
   uploading_output: ["uploading", "Preparing the download"],
+  planning: ["processing", "Planning the story blueprint"],
+  assembling: ["processing", "Assembling the final document"],
 };
+
+/** Maps a runner stage to a user-facing step; story stages carry their scene number. */
+function stageStep(stage: string): ["running" | "validating" | "processing" | "verifying" | "uploading", string] | null {
+  if (STAGE_STEP[stage]) return STAGE_STEP[stage];
+  const m = stage.match(/^writing_scene_(\d{1,2})$/);
+  if (m) return ["processing", `Writing scene ${Number(m[1])}`];
+  return null;
+}
 
 /** Brings a runtime job's VISION record up to date. Safe to call on every poll; terminal work happens once. */
 export async function syncRuntimeJob(jobRow: any): Promise<boolean> {
@@ -91,10 +112,13 @@ export async function syncRuntimeJob(jobRow: any): Promise<boolean> {
     }
   }
 
-  if (rt.status === "running" && rt.stage && STAGE_STEP[rt.stage]) {
-    const [status, detail] = STAGE_STEP[rt.stage];
-    const last = job.steps[job.steps.length - 1];
-    if (last?.detail !== detail) { await job.step(status, detail); changed = true; }
+  if (rt.status === "running" && rt.stage) {
+    const mapped = stageStep(rt.stage);
+    if (mapped) {
+      const [status, detail] = mapped;
+      const last = job.steps[job.steps.length - 1];
+      if (last?.detail !== detail) { await job.step(status, detail); changed = true; }
+    }
   }
 
   // The runner crashed or was cancelled on GitHub without reporting back.
@@ -149,6 +173,22 @@ async function finalize(job: JobRun, rt: any) {
   if (cnt[0]?.n !== rt.output_chunks) throw new Error("The converted file arrived incomplete.");
   const bytes = await getArtifactBytes(rt.output_key);
   if (bytes.length !== rt.output_size || (await sha256Hex(bytes)) !== rt.output_sha256) { await deleteArtifactBytes(rt.output_key).catch(() => undefined); throw new Error("The converted file failed its integrity check."); }
+  if (rt.operation === "story_generate") {
+    const text = new TextDecoder().decode(bytes);
+    if (text.trim().length < 500) { await deleteArtifactBytes(rt.output_key).catch(() => undefined); throw new Error("The generated story is incomplete."); }
+    await job.step("saving", "Saving the story privately to Google Drive");
+    const name = (typeof rt.output_name === "string" && rt.output_name.endsWith(".md")) ? rt.output_name : "story.md";
+    await job.saveArtifact(name, "text/markdown", bytes, "file");
+    await d1("UPDATE runtime_jobs SET status = 'completed', updated_at = ? WHERE job_id = ?", [now(), rt.job_id]);
+    await job.finish({ operation: rt.operation, fileName: name, output: name, details: result ?? {} });
+    // The full story also lands in the chat as the task's reply, so it survives artifact expiry.
+    if (job.sessionId) {
+      const { saveReply } = await import("@/lib/jobs/chat-background.server");
+      await saveReply(job.userId, job.sessionId, `job-${job.id}`, text, { executionMode: "background" }).catch(() => undefined);
+    }
+    await deleteArtifactBytes(rt.output_key).catch(() => undefined);
+    return;
+  }
   if (!outputMatches(params.target, bytes)) { await deleteArtifactBytes(rt.output_key).catch(() => undefined); throw new Error(`The output is not a valid ${String(params.target).toUpperCase()} file.`); }
   await job.step("saving", "Saving the verified file privately to Google Drive");
   const name = outputName(rt.input_name, params.target);
