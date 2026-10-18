@@ -164,7 +164,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
       const row: any = data?.[0];
       if (row && !stop) {
         finish();
-        setMessages((prev) => prev.some((m) => m.id === row.id) ? prev : [...prev, { id: row.id, role: "assistant", content: row.content || "", timestamp: new Date(row.created_at), toolId: row.metadata?.toolId }]);
+        setMessages((prev) => prev.some((m) => m.id === row.id) ? prev : [...prev, { id: row.id, role: "assistant", content: row.content || "", timestamp: new Date(row.created_at), toolId: row.metadata?.toolId, activity: row.metadata?.activity, deep: row.metadata?.deep }]);
         setNewMessageIds((prev) => new Set(prev).add(row.id));
         return;
       }
@@ -181,7 +181,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
         else if (gen.status !== "completed") {
           const note = endedWithoutAnswer(gen);
           finish();
-          if (note) setMessages((prev) => prev.some((m) => m.id === gen.id) ? prev : [...prev, { id: gen.id, role: "assistant", content: note, timestamp: new Date(gen.updatedAt) }]);
+          if (note) setMessages((prev) => prev.some((m) => m.id === gen.id) ? prev : [...prev, { id: gen.id, role: "assistant", content: note, timestamp: new Date(gen.updatedAt), activity: { seconds: Math.max(0, Math.round((gen.updatedAt - gen.startedAt) / 1000)), steps: [], failed: true, detail: gen.detail || gen.error } }]);
           return;
         }
         // completed: the saved answer row appears on the next tick
@@ -240,6 +240,8 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
               timestamp: new Date(newMsg.created_at),
               imageUrl: newMsg.image_url || undefined,
               toolId: newMsg.metadata?.toolId,
+              activity: newMsg.metadata?.activity,
+              deep: newMsg.metadata?.deep,
             };
             setMessages((prev) => {
               // Avoid duplicates
@@ -333,12 +335,13 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
     // Private chats get real AI replies but never create saved rows or background jobs.
     if (isIncognito) {
       setIsTyping(true);
+      const privateStart = Date.now();
       const history = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }));
       try {
         const reply = await streamChat(history, () => {}, tool?.id, { mode: taskMode, webSearch: forceSearch });
-        setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: reply || "I couldn't come up with an answer.", timestamp: new Date() }]);
+        setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: reply || "I couldn't come up with an answer.", timestamp: new Date(), activity: { seconds: Math.round((Date.now() - privateStart) / 1000), steps: [], failed: !reply } }]);
       } catch (e: any) {
-        setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: `Sorry, an error occurred: ${e.message}`, timestamp: new Date() }]);
+        setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: `Sorry, an error occurred: ${e.message}`, timestamp: new Date(), activity: { seconds: Math.round((Date.now() - privateStart) / 1000), steps: [], failed: true, detail: e.message } }]);
       }
       setIsTyping(false);
       return;
@@ -426,7 +429,9 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
 
     }
 
-    // Regular chat - send to backend, response will come via Realtime
+    // Measure once, including failures; the final status replaces the running line.
+    const requestStartedAt = Date.now();
+    let requestSteps: string[] = [];
     try {
       const chatMessages = messages
         .filter((m) => !m.imageUrl || m.role === "user")
@@ -489,7 +494,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
           ? prev.map((m) => (m.id === replyId ? { ...m, content: visible } : m))
           : [...prev, { id: replyId, role: "assistant", content: visible, timestamp: new Date(), toolId: tool?.id }]);
       }, tool?.id, { mode: taskMode, webSearch: forceSearch, onMeta: (m) => { meta = m; }, signal: ctrl.signal, requestId: replyId, conversationId: sessionId ?? undefined,
-        onTask: (ev) => { taskRef = applyTaskEvent(taskRef, ev, replyId); setTaskState(taskRef); },
+        onTask: (ev) => { taskRef = applyTaskEvent(taskRef, ev, replyId); requestSteps = taskRef.history.map((stage) => workStateLabel(workStateForStage(stage))).filter((v): v is string => Boolean(v)); setTaskState(taskRef); },
         onStatus: (st, detail) => { const ds = STATUS_MAP[st]; if (!deep || !ds) return; deepReal = true; lastDeep = { stage: ds, detail }; deepHist.push(ds); setMessages((prev) => prev.some((m) => m.id === replyId) ? prev.map((m) => (m.id === replyId ? { ...m, deep: { stage: ds, detail } } : m)) : prev); } }).finally(() => { stopDeepTimers(); if (abortRef.current === ctrl) abortRef.current = null; setStreaming(false); });
       const stopped = ctrl.signal.aborted;
       const replyText = finalText || (stopped ? "Stopped." : "I couldn't come up with an answer. Please try again.");
@@ -497,11 +502,11 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
       const taskHist = (taskRef as TaskState | null)?.history;
       const activity = taskHist?.length
         ? activitySummary(taskHist, (Date.now() - taskStart) / 1000) ?? undefined
-        : undefined;
+        : { seconds: Math.max(0, Math.round((Date.now() - taskStart) / 1000)), steps: [] };
       const deepSeconds = Math.max(1, Math.round((Date.now() - deepStart) / 1000));
       const deepActivity = deep && deepHist.length ? deepActivitySummary(deepHist, deepSeconds) ?? undefined : undefined;
       let reply: ChatMessageType = { id: replyId, role: "assistant", content: replyText, timestamp: new Date(), toolId: tool?.id, executionMode: deep ? "deep" : meta.executionMode,
-        ...(activity || deepActivity ? { activity: deepActivity ?? activity } : {}),
+        activity: { ...(deepActivity ?? activity ?? { seconds: deepSeconds, steps: [] }), failed: stopped || !finalText || lastDeep.stage === "failed", ...(stopped ? { detail: "Stopped by you." } : {}) },
         ...(deep ? { deep: { stage: finalText && lastDeep.stage !== "failed" ? "done" : "failed", seconds: deepSeconds, detail: lastDeep.detail } as const } : {}) };
       // Research reports become a saved document shown as a compact card (saved once per reply).
       if (meta.output === "document" && finalText) {
@@ -532,7 +537,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
     } catch (e: any) {
       setTaskState(null);
       if (e?.name === "AbortError") { clearTimeout(phaseTimer); setIsTyping(false); return; }
-      const errMsg: ChatMessageType = { id: (Date.now() + 1).toString(), role: "assistant", content: `Sorry, an error occurred: ${e.message}`, timestamp: new Date() };
+      const errMsg: ChatMessageType = { id: (Date.now() + 1).toString(), role: "assistant", content: `Sorry, an error occurred: ${e.message}`, timestamp: new Date(), activity: { seconds: Math.max(0, Math.round((Date.now() - requestStartedAt) / 1000)), steps: requestSteps, failed: true, detail: e.message } };
       // Replace a Deep Thinking status card with the error instead of leaving it spinning.
       setMessages((prev) => [...prev.filter((m) => !(m.deep && m.deep.stage !== "done" && !m.content)), errMsg]);
       clearTimeout(phaseTimer);

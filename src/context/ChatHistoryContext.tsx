@@ -103,7 +103,7 @@ export function buildMetadata(msg: ChatMessage): Record<string, any> {
   if (msg.document) meta.document = msg.document;
   if (msg.executionMode) meta.executionMode = msg.executionMode;
   if (msg.deep?.stage === "done" || msg.deep?.stage === "failed") meta.deep = { stage: msg.deep.stage, seconds: msg.deep.seconds, detail: msg.deep.detail };
-  if (msg.activity?.steps?.length) meta.activity = { seconds: msg.activity.seconds, steps: msg.activity.steps };
+  if (msg.activity) meta.activity = { ...msg.activity };
   if (msg.pasted?.length) meta.pasted = msg.pasted;
   if (msg.typed !== undefined) meta.typed = msg.typed;
   if (msg.attachments?.length) meta.attachments = msg.attachments;
@@ -124,7 +124,7 @@ function rowToMessage(row: any): ChatMessage {
     document: meta.document,
     executionMode: meta.executionMode,
     deep: meta.deep ? { stage: meta.deep.stage === "failed" ? "failed" : "done", seconds: meta.deep.seconds, detail: meta.deep.detail } : undefined,
-    activity: Array.isArray(meta.activity?.steps) && meta.activity.steps.length ? { seconds: Number(meta.activity.seconds) || 0, steps: meta.activity.steps.map(String) } : undefined,
+    activity: Array.isArray(meta.activity?.steps) && Number.isFinite(Number(meta.activity.seconds)) ? { seconds: Number(meta.activity.seconds), steps: meta.activity.steps.map(String), ...(meta.activity.failed ? { failed: true } : {}), ...(meta.activity.detail ? { detail: String(meta.activity.detail) } : {}) } : undefined,
     pasted: meta.pasted,
     typed: meta.typed,
     attachments: meta.attachments,

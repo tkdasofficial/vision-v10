@@ -77,11 +77,12 @@ export default function JobCard({ job: given, onRetry, compact }: { job: JobView
   const r = job.result ?? {};
   const showContents = canShowJobContents(job);
   if (job.type === "long_context" && (job.status === "completed" || job.status === "completed_with_warnings") && job.artifacts.length) {
-    return <div className="space-y-3"><div className="flex flex-wrap gap-2">{job.artifacts.map((a) => <ArtifactButton key={a.id} id={a.id} name={a.name} size={fmt(a.size)} />)}</div>{showContents && r.content && <CleanText text={r.content} />}</div>;
+    return <div className="space-y-3">{statusLine}<div className="flex flex-wrap gap-2">{job.artifacts.map((a) => <ArtifactButton key={a.id} id={a.id} name={a.name} size={fmt(a.size)} />)}</div>{showContents && r.content && <CleanText text={r.content} />}</div>;
   }
   // File deliveries never expose their contents unless the request opted in.
   if (job.type === "code_export" && (job.status === "completed" || job.status === "completed_with_warnings")) {
     return <div className="space-y-3">
+      {statusLine}
       <div className="flex flex-wrap gap-2">{job.artifacts.map((a) => <ArtifactButton key={a.id} id={a.id} name={a.name} />)}</div>
       {showContents && r.content && <CodeBlock code={r.content} language={r.language} filename={r.fileName} />}
     </div>;
@@ -91,6 +92,7 @@ export default function JobCard({ job: given, onRetry, compact }: { job: JobView
     const last = r.steps?.length ? r.steps[r.steps.length - 1] : null;
     return (
       <div className="space-y-3">
+        {statusLine}
         {showContents && r.steps?.map((s: any, i: number) => s.preview?.kind === "svg" && <img key={i} src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(s.preview.content)}`} alt="" className="max-h-96 w-full rounded-xl border border-border bg-background object-contain" />)}
         {job.artifacts.length > 0 && <div className="flex flex-wrap gap-2">{job.artifacts.map((a) => <ArtifactButton key={a.id} id={a.id} name={a.name} />)}</div>}
         {showContents && <CleanText text={r.displayText ?? (last ? (last.preview?.kind === "markdown" ? last.preview.content : last.text ?? "") : r.answer ?? "")} />}
