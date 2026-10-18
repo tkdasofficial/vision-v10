@@ -345,6 +345,9 @@ export const ChatHistoryProvider = ({ children }: { children: ReactNode }) => {
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const pending = messages.filter((m) => (m.content || m.deleted) && (!m.job || m.deleted || m.archivedJob) && savedRef.current.get(m.id) !== JSON.stringify([m.content, buildMetadata(m)]));
     if (!pending.length) return;
+    // An older debounced snapshot must not overwrite an immediate edit/tombstone.
+    clearTimeout(saveTimers.current[id]);
+    pendingRows.current[id]?.clear();
     let last = 0;
     const rows = pending.map((m) => {
       last = Math.max(last + 1, new Date(m.timestamp).getTime() || Date.now());
@@ -354,6 +357,7 @@ export const ChatHistoryProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.from("chat_messages").upsert(rows, { onConflict: "id" });
     if (error) throw new Error("Couldn't save your message. Please try again.");
     pending.forEach((m) => savedRef.current.set(m.id, JSON.stringify([m.content, buildMetadata(m)])));
+    setHistory((prev) => prev.map((c) => c.id === id ? { ...c, messages } : c));
     lsSetMessages(id, messages.filter((m) => !m.job || m.deleted || m.archivedJob));
   }, []);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
