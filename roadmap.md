@@ -1,5 +1,10 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Every reply status and actions
+- [ ] Keep one status at the top of every AI reply, including saved/file/failed responses.
+- [ ] Add Copy, Speak, Share and a menu with Report, Delete Message and Create Branch; preserve saved history and incognito privacy.
+- [ ] Verify signed-in actions, reload persistence and compact phone layout without deployment.
+
 ## Current request — Consistent terminal status position
 - [x] Shared compact terminal status across normal/private replies, Deep and completed file jobs; real elapsed time persists even without stage history. Immediate reply save prevents reload dropping duration. Signed-in normal task returned 42 and Worked for 2s, retained after immediate reload; Deep restored Worked for 96s exactly once; failed workbook expanded Failed after 210s → Generating; saved workbook shows one success summary and download. Phone 360×581 inspected with no overflow. Full suite: 1,460 passed, one skipped; automatic build OK. No backend deployment.
 
