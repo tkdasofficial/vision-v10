@@ -7,7 +7,7 @@ export function mergeChatJobs(messages: ChatMessage[], jobs: JobView[]): ChatMes
   const byId = new Map(jobs.map((job) => [job.id, job]));
   const result = messages.map((message) => {
     const latest = message.job && byId.get(message.job.id);
-    if (!latest) return message;
+    if (!latest || message.archivedJob) return message;
     byId.delete(latest.id);
     if (Date.parse(latest.updatedAt) < Date.parse(message.job?.updatedAt ?? "")) return message;
     return { ...message, job: latest };
