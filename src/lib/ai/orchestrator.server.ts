@@ -27,6 +27,7 @@ export async function orchestrateText(messages: unknown[], opts: {
   const deadlineAt = opts.deadlineAt ?? Date.now() + AI_LIMITS.providerChainMs;
   const models = opts.models ?? TEXT_CHAIN;
   const call = opts.call ?? streamFromProvider;
+  let inputRejected: { status: number; reason: string } | null = null;
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
     if (opts.signal.aborted) return { ok: false, status: 499, reason: "Request cancelled." };

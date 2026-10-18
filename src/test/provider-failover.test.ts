@@ -28,6 +28,18 @@ describe("sequential provider orchestration", () => {
     expect((await orchestrateText([], { ...options(), call })).ok).toBe(false);
     expect(call).toHaveBeenCalledTimes(1);
   });
+  it("falls back when one provider rejects the payload as too large (413)", async () => {
+    const call = vi.fn().mockImplementation(async () => call.mock.calls.length === 1 ? failed(413, "request too large") : success());
+    const result = await orchestrateText([], { ...options(), call });
+    expect(result.ok).toBe(true);
+    expect(call.mock.calls.map((args) => args[0].provider)).toEqual(["nvidia", "groq"]);
+  });
+  it("reports a too-large request only when every provider rejects it", async () => {
+    const call = vi.fn().mockResolvedValue(failed(413, "request too large"));
+    const result = await orchestrateText([], { ...options(), call });
+    expect(result).toMatchObject({ ok: false, status: 413 });
+    expect(call).toHaveBeenCalledTimes(3);
+  });
   it("discards partial failed streams before switching", async () => {
     const body = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new TextEncoder().encode('data: {"response":"partial"}\n')); }, pull(c) { c.error(new Error("network")); } });
     const call = vi.fn().mockResolvedValueOnce({ ok: true, body }).mockResolvedValueOnce(success());
