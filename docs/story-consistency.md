@@ -24,7 +24,7 @@ The unchanged Lovable preview proxies API calls to the existing Cloudflare Worke
 
 ## Recorded verification — 18 October 2026
 
-- Full regression suite before the last provider-limit/routing additions: 1,456 passed, one skipped. Subsequent targeted regressions: 70 passed, one skipped.
+- Final full regression suite: 1,458 passed, one skipped across 95 files; automatic preview build OK. Restored live story still contains scene three and no duplicate completion row.
 - Signed-in preview: old failed workbook chat shows `Failed after 210s`; tapping reveals `Failed step: Generating` and the saved interruption explanation. Reload restores the same frozen duration. Desktop and 390px layout inspected, no horizontal overflow.
 - Saved completed workbook still downloads after sign-in: `Business_Performance_Analysis.xlsx`, valid ZIP, five expected worksheets and three charts.
 - A real three-scene story in chat `610b83ea-bdc6-4261-a68f-98192e857e97` showed plain `Planning…`, completed in 96 seconds and produced all three scenes. It still used the existing external story implementation; prose did not demonstrate the new structured scene contracts/audit. This is a compact UI pass, **not** an upgraded story-pipeline end-to-end pass.
