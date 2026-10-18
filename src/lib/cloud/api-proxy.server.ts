@@ -10,7 +10,9 @@ import { DEVELOPMENT_API_ORIGIN } from "@/lib/backend-config";
 
 /** The Cloudflare Worker's public origin, when configured. */
 export function getApiOrigin(development = import.meta.env.DEV): string | undefined {
-  const raw = getSecret("API_ORIGIN") || (development ? DEVELOPMENT_API_ORIGIN : undefined);
+  // Fall back to the shared public backend whenever API_ORIGIN is unset — the Lovable
+  // preview is a production-mode build (DEV=false) but still has no API_ORIGIN secret.
+  const raw = getSecret("API_ORIGIN") || DEVELOPMENT_API_ORIGIN;
   if (!raw) return undefined;
   try {
     const url = new URL(raw);
