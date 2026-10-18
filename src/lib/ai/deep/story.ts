@@ -340,10 +340,8 @@ export function storyAdapter(model: string, provider: string): StoryAdapter {
     outputTokens: 8192,
     headroomTokens: 2048,
     schemaMode: "normalized-json",
-    tokenization: gpt
-      ? "o200k_harmony BPE estimate (not provider usage)"
-      : "UTF-8 byte upper bound; native tokenizer unavailable",
-    countTokens: gpt ? (s) => cachedCount(s, (x) => encode(x).length) : (s) => new TextEncoder().encode(s).length,
+    tokenization: "chars/3 conservative estimate (not provider usage)",
+    countTokens: (s) => Math.ceil(s.length / 3),
   };
 }
 export function budgetStoryMessages(
