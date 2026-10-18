@@ -21,6 +21,10 @@ export async function collectStream(body: ReadableStream<Uint8Array>): Promise<{
       if (!l.startsWith("data:")) continue;
       const data = l.slice(5).trim();
       if (data === "[DONE]") continue;
+      // Reasoning models stream thousands of "reasoning_content" delta lines before any
+      // visible text; parsing each as JSON burns the Worker CPU budget. Skip lines that
+      // cannot carry visible content, a finish reason, or a non-chat "response" field.
+      if (!/[,{]"content"\s*:/.test(data) && !data.includes("finish_reason") && !data.includes('"response"')) continue;
       try {
         const j = JSON.parse(data);
         const c = j.choices?.[0];
