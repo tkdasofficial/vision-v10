@@ -50,8 +50,9 @@ export const Route = createFileRoute("/api/sandbox-generations/$jobId")({
           return Response.json({ ok });
         }
         if (action === "retry" || action === "resume") {
+          const { prepareKeepAlive } = await import("@/lib/jobs/chat-background.server");
+          const keepAlive = await prepareKeepAlive();
           const promise = runner.retryJob(caller.user.id, params.jobId).catch((e) => console.error("[sandbox] retry failed", (e as Error)?.message));
-          const { keepAlive } = await import("@/lib/jobs/chat-background.server");
           keepAlive(promise);
           return Response.json({ ok: true }, { status: 202 });
         }

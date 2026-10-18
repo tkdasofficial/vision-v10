@@ -1,5 +1,10 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Background workers
+- [x] Chat, files and sandbox resolve runtime lifetime before starting work, then register synchronously; SSE start no longer waits for completion before delivering status. Proxy drain is also registered. Missing Worker lifetime fails before acceptance; reply storage failure cannot count as completed; normal/deep error replies persist when storage is available.
+- [x] Signed-in task ab607098-01f6-4367-afb2-4f5ed327f545 started, page closed before completion, reopened and reloaded: complete 12-item answer restored with Worked for 63s. 61 targeted tests and full suite 1,470 passed/one skipped; automatic build OK. Preview URL unchanged; no deployment.
+- [ ] Verify new backend lifetime changes on executing Cloudflare version — blocked by no-deployment scope. Current preview proxy improvement is exercised; backend changes are source-only. Worker lifetime limits still apply; unlimited/very-long completion is not guaranteed by waitUntil.
+
 ## Current request — Diagnose unavailable AI providers
 - [x] Saved original failure is in story planning (413s). All three existing relays returned 4 with HTTP 200; Groq produced a 10-line planning outline in 3s. Found shared-deadline starvation; repaired fallback reservations and rejected expired partial streams without changing models, caps or total budget. 58 targeted regressions passed; automatic build OK; current-code real planning call succeeded in 31s.
 - [ ] Verify complete original story through the executing backend — blocked: preview proxies to unchanged Cloudflare code; retry 049b9ff3 showed Failed after 309s while its server record remained running/planning with no underlying error. No deployment authorized or performed; original full story not claimed complete.

@@ -26,7 +26,8 @@ export const Route = createFileRoute("/api/chat")({
 
         // Work is detached from the browser connection so leaving/reloading never cancels it.
         const workSignal = new AbortController().signal;
-        const { keepAlive, saveReply } = await import("@/lib/jobs/chat-background.server");
+        const { prepareKeepAlive, saveReply } = await import("@/lib/jobs/chat-background.server");
+        const keepAlive = await prepareKeepAlive();
         const body: any = await request.json().catch(() => null);
         const chatId = typeof body?.conversationId === "string" ? body.conversationId.slice(0, 64) : undefined;
         const { loadConversationHistory } = await import("@/lib/ai/memory.server");
@@ -273,13 +274,15 @@ export const Route = createFileRoute("/api/chat")({
                 console.error("[chat:deep]", { category: "internal_error" });
                 outcome = { status: "failed", error: "Internal error" };
                 providerProgress?.("failed", "Internal error");
-                put(sseChunk("Deep Thinking stopped because of an internal error — no verified answer was produced."));
+                const errorText = "Deep Thinking stopped because of an internal error — no verified answer was produced.";
+                await saveReply(caller.user.id, chatId, requestId, errorText, { executionMode: task.executionMode, deep: { stage: "failed", detail: "Internal error" } }).catch(() => {});
+                put(sseChunk(errorText));
               } finally {
                 await gen?.finish(outcome.status, outcome.error);
                 clearInterval(ping);
                 try { ctrl.enqueue(sseDone()); ctrl.close(); } catch { /* closed */ }
               }
-            })(); keepAlive(run); return run;
+            })(); keepAlive(run);
             },
           });
           return new Response(stream, {
@@ -364,6 +367,7 @@ export const Route = createFileRoute("/api/chat")({
               }
               if (!best) {
                 emit("failed", finalFailure);
+                await saveReply(caller.user.id, chatId, taskId, finalFailure, { executionMode: task.executionMode, deep: { stage: "failed", detail: finalFailure } });
                 send(`data: ${JSON.stringify({ choices: [{ delta: { content: finalFailure } }] })}\n\n`);
                 return;
               }
@@ -406,13 +410,14 @@ export const Route = createFileRoute("/api/chat")({
             } catch (e) {
               console.error("[chat:task]", { category: "internal_error" });
               emit("failed", "Internal error");
+              await saveReply(caller.user.id, chatId, taskId, "The request stopped because of an internal error.", { executionMode: task.executionMode, deep: { stage: "failed", detail: "Internal error" } }).catch(() => {});
               send(`data: ${JSON.stringify({ vision_error: { message: "The request stopped because of an internal error." } })}\n\n`);
             } finally {
               await gen?.finish(outcome.status, outcome.error);
               clearInterval(ping);
               try { ctrl.enqueue(sseComment("end")); ctrl.enqueue(sseDone()); ctrl.close(); } catch { /* closed */ }
             }
-          })(); keepAlive(run); return run;
+          })(); keepAlive(run);
           },
         });
         return new Response(stream, {

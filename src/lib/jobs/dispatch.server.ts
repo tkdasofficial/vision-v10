@@ -11,6 +11,8 @@ export async function startJob(userId: string, id: string, type: JobType, input:
     const existing = await getJob(userId, id).catch(() => null);
     if (existing) return existing;
   }
+  const { prepareKeepAlive } = await import("./chat-background.server");
+  const keepAlive = await prepareKeepAlive();
   const stored = type === "runtime_task" ? { operation: input.operation, params: input.params, fileName: input.fileName, mime: input.mime, sourceArtifactId: input.sourceArtifactId ?? null } : type === "zip_analyze" ? { fileName: input.fileName, sourceArtifactId: input.sourceArtifactId ?? null } : type === "agent_task" ? { prompt: input.prompt, sources: input.sources ?? [], ...(input.resumeFrom ? { resumeFrom: input.resumeFrom } : {}) } : input;
   const job = await createJob(id, userId, type, stored, attempt, sessionId);
   const { runCodeExport, runProjectGenerate, runZipAnalyze } = await import("./runners.server");
@@ -66,9 +68,8 @@ export async function startJob(userId: string, id: string, type: JobType, input:
     await job.fail(e);
   }
   })();
-  // Long tasks outlive any request: the work keeps running after the response is sent and the
-  // browser keeps polling /api/jobs/$jobId, so a cut connection can never kill a live task.
-  const { keepAlive } = await import("./chat-background.server");
+  // Register synchronously while the request is active. Runtime lifetime limits
+  // still apply; durable checkpoints support retry if the host interrupts work.
   keepAlive(run);
   // Fast tasks still return their final view in the same request; slow ones return "running".
   await Promise.race([run, new Promise((r) => setTimeout(r, 20_000))]);

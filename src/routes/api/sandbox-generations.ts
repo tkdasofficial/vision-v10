@@ -39,11 +39,12 @@ export const Route = createFileRoute("/api/sandbox-generations")({
         const { sandboxReady } = await import("@/lib/sandbox/db.server");
         if (!sandboxReady()) return Response.json({ error: "Generation store unavailable." }, { status: 503 });
         const { createJob } = await import("@/lib/sandbox/store.server");
+        const { prepareKeepAlive } = await import("@/lib/jobs/chat-background.server");
+        const keepAlive = await prepareKeepAlive();
         const job = await createJob(caller.user.id, { instructions, modelConfig: body?.modelConfig, settings: body?.settings, requestId });
         // Run detached: the caller polls for status; a reload never duplicates the job.
         const { runJob } = await import("@/lib/sandbox/runner.server");
         const promise = runJob(caller.user.id, job.id).catch((e) => console.error("[sandbox] run failed", (e as Error)?.message));
-        const { keepAlive } = await import("@/lib/jobs/chat-background.server");
         keepAlive(promise);
         return Response.json({ job }, { status: 202, headers: { "Cache-Control": "no-store" } });
       },
