@@ -494,7 +494,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
           ? prev.map((m) => (m.id === replyId ? { ...m, content: visible } : m))
           : [...prev, { id: replyId, role: "assistant", content: visible, timestamp: new Date(), toolId: tool?.id }]);
       }, tool?.id, { mode: taskMode, webSearch: forceSearch, onMeta: (m) => { meta = m; }, signal: ctrl.signal, requestId: replyId, conversationId: sessionId ?? undefined,
-        onTask: (ev) => { taskRef = applyTaskEvent(taskRef, ev, replyId); requestSteps = taskRef.history.map((stage) => workStateLabel(workStateForStage(stage))).filter((v): v is string => Boolean(v)); setTaskState(taskRef); },
+        onTask: (ev) => { taskRef = applyTaskEvent(taskRef, ev, replyId); requestSteps = (taskRef?.history ?? []).map((stage) => workStateLabel(workStateForStage(stage))).filter((v): v is string => Boolean(v)); setTaskState(taskRef); },
         onStatus: (st, detail) => { const ds = STATUS_MAP[st]; if (!deep || !ds) return; deepReal = true; lastDeep = { stage: ds, detail }; deepHist.push(ds); setMessages((prev) => prev.some((m) => m.id === replyId) ? prev.map((m) => (m.id === replyId ? { ...m, deep: { stage: ds, detail } } : m)) : prev); } }).finally(() => { stopDeepTimers(); if (abortRef.current === ctrl) abortRef.current = null; setStreaming(false); });
       const stopped = ctrl.signal.aborted;
       const replyText = finalText || (stopped ? "Stopped." : "I couldn't come up with an answer. Please try again.");
@@ -516,7 +516,10 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
         } catch { /* keep the report as a normal chat reply */ }
       }
       // Save the full reply first, even if this screen is replaced while it renders.
-      if (sessionId) updateChatMessages(sessionId, [...messages, userMsg, reply]);
+      if (sessionId) {
+        await persistChatMessages(sessionId, [...messages, userMsg, reply]);
+        updateChatMessages(sessionId, [...messages, userMsg, reply]);
+      }
       clearTimeout(phaseTimer);
       const put = (r: ChatMessageType) => setMessages((prev) => prev.some((m) => m.id === replyId) ? prev.map((m) => (m.id === replyId ? r : m)) : [...prev, r]);
       const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
