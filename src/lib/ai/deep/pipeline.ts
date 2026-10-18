@@ -4,6 +4,8 @@ import type { RequestAnalysis } from "./analyze";
 import { nearestFeasible, planDurations } from "./durations";
 import { ranges, validateCandidate, type Issue } from "./validators";
 import { instructionAddendum, normalizeSections, spliceSections, splitSections } from "./instructions";
+import { runStructuredStory, type StoryStore } from "./story-run";
+import type { StoryAdapter } from "./story";
 
 export type ChatMsg = { role: "system" | "user" | "assistant"; content: unknown };
 export type CallResult = { ok: true; text: string; finishReason: string | null } | { ok: false; status: number; reason: string };
@@ -88,7 +90,13 @@ export async function runDeepPipeline(opts: {
   fallbackCall?: ModelCall;
   /** Truthful progress events reflecting the stage actually running. */
   progress?: (stage: "analyzing" | "planning" | "generating" | "verifying" | "correcting" | "assembling") => void;
+  story?: { requestId: string; adapter: StoryAdapter; store?: StoryStore; reviewCall?: ModelCall };
 }): Promise<DeepResult> {
+  if (opts.story && opts.analysis.items && /^(scene|chapter|shot|panel|episode|beat)s?$/i.test(opts.analysis.items.noun)) {
+    const run = await runStructuredStory({ request: opts.request ?? "", requestId: opts.story.requestId, analysis: opts.analysis, system: String(opts.messages.find((m) => m.role === "system")?.content ?? ""), call: opts.call, reviewCall: opts.story.reviewCall, adapter: opts.story.adapter, store: opts.story.store, maxRepairs: opts.limits?.maxCorrections, budgetMs: opts.limits?.budgetMs, now: opts.now, progress: opts.progress });
+    if (run.status !== "passed") return { ok: false, status: 422, reason: run.issues.map((i) => `${i.sceneId} ${i.category}: ${i.evidence}`).join("; "), stages: ["story", "validation-unresolved"] };
+    return { ok: true, text: run.result ?? "", remaining: [], corrections: run.repairs.length, continuations: 0, stages: ["story", "plan-validated", "scene-validation", "global-audit"] };
+  }
   const prog = opts.progress ?? (() => {});
   const L = { ...DEEP_LIMITS, ...opts.limits };
   const now = opts.now ?? Date.now;

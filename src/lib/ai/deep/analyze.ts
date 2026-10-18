@@ -57,7 +57,7 @@ function parseClock(v: string, unit?: string): number {
 }
 
 export function analyzeRequest(text: string): RequestAnalysis {
-  const t = text.slice(0, 20000);
+  const t = text;
   const m = COUNT_RE.exec(t);
   const count = m ? toNum(m[1]) : NaN;
   const items = Number.isFinite(count) && count >= 1 && count <= MAX_ITEMS ? { count, noun: singular(m![2]) } : null;
