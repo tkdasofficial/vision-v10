@@ -87,6 +87,10 @@ export type PastedBlock = { title: string; lines: number; text: string };
 export type MessageAttachment = { name: string; kind: "image" | "video" | "audio" | "file"; mime?: string; size?: number };
 
 export type ChatMessage = {
+  /** Durable tombstone prevents removed file replies being restored from jobs. */
+  deleted?: boolean;
+  /** A branch keeps the result snapshot without starting or duplicating a job. */
+  archivedJob?: boolean;
   id: string;
   /** Long prompts pasted as their own card (50+ lines). `typed` is what the user wrote around them. */
   pasted?: PastedBlock[];

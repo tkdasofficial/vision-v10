@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo, forwardRef } from "react";
 import type { ChatMessage as ChatMessageType, DeepStage } from "@/lib/types";
-import { Copy, Check, ChevronRight, Volume2, VolumeX, ThumbsUp, ThumbsDown, Flag, Loader2, AlertCircle } from "lucide-react";
+import { Copy, Check, ChevronRight, Volume2, VolumeX, Share2, MoreHorizontal, Flag, Trash2, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MarkdownReply from "@/components/chat/markdown-reply";
 import { useToast } from "@/hooks/use-toast";
@@ -13,8 +13,11 @@ import UserMessage from "@/components/chat/user-message";
 import DocumentCard from "@/components/chat/document-card";
 import { Button } from "@/components/ui/button";
 import TaskStatus from "@/components/task-status";
+import { MessageActions, MessageAction } from "@/components/ai-elements/message";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { replyText } from "@/lib/reply-actions";
 
-type Props = { message: ChatMessageType; isNew?: boolean };
+type Props = { message: ChatMessageType; isNew?: boolean; fallbackSeconds?: number; onDelete?: (id: string) => Promise<void>; onBranch?: (id: string) => Promise<void>; onReport?: (id: string) => Promise<void> };
 
 /**
  * Persistent activity record for a finished reply: a collapsed "Worked for Ns" row that expands
@@ -208,12 +211,12 @@ const useSegmentedTypewriter = (segments: Segment[], enabled: boolean) => {
 };
 
 
-const ChatMessage = forwardRef<HTMLDivElement, Props>(({ message, isNew = false }, ref) => {
+const ChatMessage = forwardRef<HTMLDivElement, Props>(({ message, isNew = false, fallbackSeconds = 0, onDelete, onBranch, onReport }, ref) => {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const [reported, setReported] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
   const { toast } = useToast();
   const mountedRef = useRef(false);
 
@@ -227,10 +230,9 @@ const ChatMessage = forwardRef<HTMLDivElement, Props>(({ message, isNew = false 
 
   const size = getMessageSize(message.content);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(message.content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try { await navigator.clipboard.writeText(replyText(message)); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { toast({ title: "Couldn't copy", variant: "destructive" }); }
   };
 
   const handleSpeak = useCallback(() => {
@@ -243,7 +245,7 @@ const ChatMessage = forwardRef<HTMLDivElement, Props>(({ message, isNew = false 
       toast({ title: "Not supported", description: "Text-to-speech is not supported in this browser.", variant: "destructive" });
       return;
     }
-    const plainText = message.content
+    const plainText = replyText(message)
       .replace(/```[\s\S]*?```/g, " code block ")
       .replace(/`([^`]+)`/g, "$1")
       .replace(/[#*_~>\-|]/g, "")
@@ -259,17 +261,19 @@ const ChatMessage = forwardRef<HTMLDivElement, Props>(({ message, isNew = false 
     window.speechSynthesis.speak(utterance);
   }, [speaking, message.content, toast]);
 
-  const handleFeedback = (type: "up" | "down") => {
-    setFeedback(prev => prev === type ? null : type);
-    toast({
-      title: type === "up" ? "Thanks for the feedback!" : "We'll improve",
-      description: type === "up" ? "Glad this was helpful." : "Sorry about that. We'll work on it.",
-    });
+  const handleShare = async () => {
+    try {
+      const text = replyText(message);
+      if (navigator.share) await navigator.share({ title: "Vision reply", text });
+      else { await navigator.clipboard.writeText(text); toast({ title: "Reply copied for sharing" }); }
+    } catch (error) { if (!(error instanceof Error && error.name === "AbortError")) toast({ title: "Couldn't share", variant: "destructive" }); }
   };
-
-  const handleReport = () => {
-    setReported(true);
-    toast({ title: "Reported", description: "This response has been flagged for review." });
+  const runAction = async (action?: (id: string) => Promise<void>, report = false) => {
+    if (!action) return;
+    setActionBusy(true);
+    try { await action(message.id); if (report) { setReported(true); toast({ title: "Reported" }); } }
+    catch (error) { toast({ title: error instanceof Error ? error.message : "Couldn't complete this action", variant: "destructive" }); }
+    finally { setActionBusy(false); }
   };
 
   // Find which segment is currently animating (for cursor placement)
@@ -296,6 +300,7 @@ const ChatMessage = forwardRef<HTMLDivElement, Props>(({ message, isNew = false 
             {/* Finished-task summary ("Worked for Ns") sits above the results, expandable to the real steps. */}
             {!message.job && message.activity && <ActivityRow activity={{ ...message.activity, failed: message.activity.failed || message.deep?.stage === "failed", detail: message.deep?.detail ?? message.activity.detail }} />}
             {!message.job && !message.activity && message.deep && (message.deep.stage === "done" || message.deep.stage === "failed") && <ActivityRow activity={{ seconds: message.deep.seconds ?? 0, steps: [], failed: message.deep.stage === "failed", detail: message.deep.detail }} />}
+            {!message.job && !message.activity && !message.deep && <ActivityRow activity={{ seconds: fallbackSeconds, steps: [] }} />}
             {message.imageUrl && (
               <img
                 src={message.imageUrl}
@@ -344,25 +349,18 @@ const ChatMessage = forwardRef<HTMLDivElement, Props>(({ message, isNew = false 
               <FileCreatorCard file={message.generatedFile} />
             )}
             {/* Action bar */}
-            {message.content && typingDone && (!message.deep || message.deep.stage === "done") && (
-              <div className="flex items-center gap-0.5 pt-1">
-                <ActionButton onClick={handleSpeak} active={speaking} title={speaking ? "Stop listening" : "Listen"}>
-                  {speaking ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                </ActionButton>
-                <ActionButton onClick={handleCopy} active={copied} title="Copy">
-                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                </ActionButton>
-                <ActionButton onClick={() => handleFeedback("up")} active={feedback === "up"} title="Good response">
-                  <ThumbsUp className="w-3.5 h-3.5" />
-                </ActionButton>
-                <ActionButton onClick={() => handleFeedback("down")} active={feedback === "down"} title="Bad response">
-                  <ThumbsDown className="w-3.5 h-3.5" />
-                </ActionButton>
-                <ActionButton onClick={handleReport} active={reported} disabled={reported} title="Report">
-                  <Flag className="w-3.5 h-3.5" />
-                </ActionButton>
-              </div>
-            )}
+            <MessageActions className="gap-1 pt-1 text-muted-foreground" aria-label="Reply actions">
+              <MessageAction tooltip="Copy" aria-label="Copy" onClick={() => void handleCopy()}>{copied ? <Check /> : <Copy />}</MessageAction>
+              <MessageAction tooltip={speaking ? "Stop speaking" : "Speak"} aria-label={speaking ? "Stop speaking" : "Speak"} onClick={handleSpeak}>{speaking ? <VolumeX /> : <Volume2 />}</MessageAction>
+              <MessageAction tooltip="Share" aria-label="Share" onClick={() => void handleShare()}><Share2 /></MessageAction>
+              <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" title="More options" aria-label="More options"><MoreHorizontal /></Button></DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem disabled={reported || actionBusy || !onReport} onSelect={() => void runAction(onReport, true)}><Flag />{reported ? "Reported" : "Report"}</DropdownMenuItem>
+                  <DropdownMenuItem disabled={actionBusy || !onDelete} onSelect={() => void runAction(onDelete)} className="text-destructive focus:text-destructive"><Trash2 />Delete Message</DropdownMenuItem>
+                  <DropdownMenuItem disabled={actionBusy || !onBranch} onSelect={() => void runAction(onBranch)}><GitBranch />Create Branch</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </MessageActions>
           </div>
         </div>
       )}
