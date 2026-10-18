@@ -30,9 +30,14 @@ export async function orchestrateText(messages: unknown[], opts: {
     if (Date.now() >= deadlineAt) break;
     if (i > 0) await opts.onEvent?.({ stage: "switching_provider", provider: model.provider, model: model.label });
     const started = Date.now();
+    // Leave each remaining provider connection time within the same total budget.
+    const remainingProviders = models.length - i - 1;
+    const remainingMs = deadlineAt - started;
+    const reserveMs = Math.min(remainingProviders * AI_LIMITS.connectMs, remainingMs * remainingProviders / (remainingProviders + 1));
+    const providerDeadlineAt = deadlineAt - reserveMs;
     let status = 502;
     let category = "empty_or_interrupted_stream";
-    const result = await call(model, messages, { maxTokens: opts.maxTokens, deep: opts.deep, deadlineAt, onEvent: opts.onEvent }, opts.signal);
+    const result = await call(model, messages, { maxTokens: opts.maxTokens, deep: opts.deep, deadlineAt: providerDeadlineAt, onEvent: opts.onEvent }, opts.signal);
     if (result.ok) {
       try {
         const output = await collectStream(result.body);

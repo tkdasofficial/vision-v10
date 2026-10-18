@@ -101,12 +101,13 @@ async function attemptProvider(t: ModelRef, messages: unknown[], opts: { maxToke
       let ended = false;
       let streamTimer: ReturnType<typeof setTimeout> | undefined;
       const cleanup = () => { if (ended) return; ended = true; release(); signal.removeEventListener("abort", abortStream); clearTimeout(streamTimer); };
-      const abortStream = () => { ctrl.abort(); void reader.cancel().catch(() => {}); cleanup(); };
+      let terminalError: Error | undefined;
+      const abortStream = () => { terminalError = new Error(signal.aborted ? "Request cancelled." : "Provider stream deadline reached."); ctrl.abort(); void reader.cancel().catch(() => {}); cleanup(); };
       streamTimer = opts.deadlineAt ? setTimeout(abortStream, Math.max(1, opts.deadlineAt - Date.now())) : undefined;
       signal.addEventListener("abort", abortStream, { once: true });
       const body = new ReadableStream<Uint8Array>({
         async pull(controller) {
-          try { const chunk = await reader.read(); if (chunk.done) { cleanup(); controller.close(); } else controller.enqueue(chunk.value); }
+          try { const chunk = await reader.read(); if (terminalError) { cleanup(); controller.error(terminalError); } else if (chunk.done) { cleanup(); controller.close(); } else controller.enqueue(chunk.value); }
           catch (error) { cleanup(); controller.error(error); }
         },
         async cancel(reason) { cleanup(); await reader.cancel(reason); },

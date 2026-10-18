@@ -1,5 +1,9 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Diagnose unavailable AI providers
+- [x] Saved original failure is in story planning (413s). All three existing relays returned 4 with HTTP 200; Groq produced a 10-line planning outline in 3s. Found shared-deadline starvation; repaired fallback reservations and rejected expired partial streams without changing models, caps or total budget. 58 targeted regressions passed; automatic build OK; current-code real planning call succeeded in 31s.
+- [ ] Verify complete original story through the executing backend — blocked: preview proxies to unchanged Cloudflare code; retry 049b9ff3 showed Failed after 309s while its server record remained running/planning with no underlying error. No deployment authorized or performed; original full story not claimed complete.
+
 ## Current request — Every reply status and actions
 - [x] Fixed saved-results 503: development API proxy now resolves the existing public Worker address even after its process variable disappears; non-dev hosts retain the explicit API_ORIGIN requirement. Signed-in jobs read returned 200 and actual saved XLSX downloaded (valid ZIP, five sheets).
 - [x] Status stays above normal/saved/file/failed responses; older messages use stored question/reply timestamps when no activity exists. Copy, Speak, Share and three-dot Report/Delete Message/Create Branch appear below every response.

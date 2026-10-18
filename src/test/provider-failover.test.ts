@@ -44,6 +44,22 @@ describe("sequential provider orchestration", () => {
     expect(call).not.toHaveBeenCalled();
   });
   it("retains the exact provider order", () => expect(TEXT_CHAIN.map((m) => m.provider)).toEqual(["nvidia", "groq", "cf"]));
+  it("reserves time for healthy fallbacks when the primary consumes its deadline", async () => {
+    let now = 1000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      const call = vi.fn().mockImplementation(async (_model, _messages, opts) => {
+        if (call.mock.calls.length === 1) { now = opts.deadlineAt; return failed(504, "timeout"); }
+        return success();
+      });
+      const result = await orchestrateText([], { ...options(), deadlineAt: 121000, call });
+      expect(result.ok).toBe(true);
+      expect(call.mock.calls.map((args) => args[0].provider)).toEqual(["nvidia", "groq"]);
+      expect(call.mock.calls[0][2].deadlineAt).toBe(61000);
+      expect(call.mock.calls[1][2].deadlineAt).toBe(91000);
+      expect(call.mock.calls.every((args) => args[2].maxTokens === 6000)).toBe(true);
+    } finally { clock.mockRestore(); }
+  });
   it("bounds transport retries to three attempts", async () => {
     const call = vi.fn().mockResolvedValue(failed(503));
     await withRetry<{ ok: false; status: number; reason: string }>(call, { classify: (r) => classifyFailure(r.status), sleep: async () => {}, max: 2 });
