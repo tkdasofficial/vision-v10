@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { encode } from "gpt-tokenizer/encoding/o200k_harmony";
 import type { ChatMsg } from "./pipeline";
 
 const id = z.string().min(1);
@@ -326,19 +325,9 @@ export type StoryAdapter = {
   tokenization: string;
   countTokens(text: string): number;
 };
-/** Portable BPE estimate with UTF-8 byte upper bound when the provider tokenizer is not available. */
-// BPE encoding is pure-JS and CPU-expensive; the same large contents (request, blueprint,
-// prior scenes) are counted once per model per call, so cache counts per process.
-const tokenCache = new Map<string, number>();
-const TOKEN_CACHE_MAX = 300;
-function cachedCount(s: string, count: (x: string) => number): number {
-  const hit = tokenCache.get(s);
-  if (hit !== undefined) return hit;
-  const n = count(s);
-  if (tokenCache.size >= TOKEN_CACHE_MAX) tokenCache.delete(tokenCache.keys().next().value!);
-  tokenCache.set(s, n);
-  return n;
-}
+/** Fast conservative token estimate (chars/3 overestimates, so budget checks stay safe).
+ *  A pure-JS BPE tokenizer was removed: encoding every large story context burned the
+ *  Worker's CPU budget and killed long story runs with "Worker exceeded CPU time limit". */
 export function storyAdapter(model: string, provider: string): StoryAdapter {
   const gpt = /gpt-oss/.test(model);
   // Published provider context limits; output remains the existing configured 8k allowance.
