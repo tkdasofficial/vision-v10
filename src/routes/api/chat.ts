@@ -210,7 +210,7 @@ export const Route = createFileRoute("/api/chat")({
               onEvent: (event) => providerProgress?.(event.stage, event.model) });
             if (!result.ok) return result;
             usedModel = result.model.label;
-            return { ok: true as const, text: result.text, finishReason: result.finishReason };
+            return { ok: true as const, text: result.text, finishReason: result.finishReason, model: result.model.model, provider: result.model.provider };
           };
           const call = callWith(models);
           // Review still uses an independent model, but its provider priority remains sequential.
@@ -256,7 +256,7 @@ export const Route = createFileRoute("/api/chat")({
                     return await callWith(order)(msgs);
                   } catch (e) { return { ok: false as const, status: 413, reason: e instanceof Error ? e.message : "Required story context exceeds token budget" }; }
                 };
-                const res = await runDeepPipeline({ messages: fullMessages as any, analysis: deepAnalysis, call, fallbackCall: reviewCall, request: lastText, plan: deepAnalysis.complex || lastText.length > 400, review: true, progress, story: { requestId, adapter, store: d1StoryStore(caller.user.id), reviewCall: storyCall(models.map((m) => m.provider === "nvidia" ? { ...m, model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning" } : m)) } });
+                const res = await runDeepPipeline({ messages: fullMessages as any, analysis: deepAnalysis, call: /^(scene|chapter|shot|panel|episode|beat)s?$/i.test(deepAnalysis.items?.noun ?? "") ? storyCall(models) : call, fallbackCall: reviewCall, request: lastText, plan: deepAnalysis.complex || lastText.length > 400, review: true, progress, story: { requestId, adapter, store: d1StoryStore(caller.user.id), reviewCall: storyCall(models.map((m) => m.provider === "nvidia" ? { ...m, model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning" } : m)) } });
                 console.log("[chat:deep]", JSON.stringify({ user: caller.user.id, model: usedModel, ok: res.ok, stages: res.stages, corrections: res.ok ? res.corrections : 0, remaining: res.ok ? res.remaining.length : null, ms: Date.now() - t0 }));
                 if (res.ok) {
                   await saveReply(caller.user.id, chatId, requestId, res.text, { executionMode: task.executionMode });

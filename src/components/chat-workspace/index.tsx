@@ -502,7 +502,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
       const deepActivity = deep && deepHist.length ? deepActivitySummary(deepHist, deepSeconds) ?? undefined : undefined;
       let reply: ChatMessageType = { id: replyId, role: "assistant", content: replyText, timestamp: new Date(), toolId: tool?.id, executionMode: deep ? "deep" : meta.executionMode,
         ...(activity || deepActivity ? { activity: deepActivity ?? activity } : {}),
-        ...(deep ? { deep: { stage: finalText && lastDeep.stage !== "failed" ? "done" : "failed", seconds: deepSeconds } as const } : {}) };
+        ...(deep ? { deep: { stage: finalText && lastDeep.stage !== "failed" ? "done" : "failed", seconds: deepSeconds, detail: lastDeep.detail } as const } : {}) };
       // Research reports become a saved document shown as a compact card (saved once per reply).
       if (meta.output === "document" && finalText) {
         try {

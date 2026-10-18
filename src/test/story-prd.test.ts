@@ -18,13 +18,13 @@ function mockStory(count: number, mutate?: (payload: any, scene: any) => void): 
   return vi.fn(async (msgs) => {
     const payload = JSON.parse(String(msgs[1].content));
     if (payload.count)
-      return { ok: true, text: JSON.stringify(storyFixture(count)), finishReason: "stop" };
+      return { ok: true as const, text: JSON.stringify(storyFixture(count)), finishReason: "stop" };
     if (String(msgs[0].content).includes("Write one scene")) {
       const scene = sceneFixture(payload.contract.id);
       mutate?.(payload, scene);
-      return { ok: true, text: JSON.stringify(scene), finishReason: "stop" };
+      return { ok: true as const, text: JSON.stringify(scene), finishReason: "stop" };
     }
-    return { ok: true, text: JSON.stringify(passReview), finishReason: "stop" };
+    return { ok: true as const, text: JSON.stringify(passReview), finishReason: "stop" };
   });
 }
 const options = (count: number, call: ModelCall) => ({
@@ -153,7 +153,7 @@ describe("story PRD contracts", () => {
       const p = JSON.parse(String(msgs[1].content));
       if (p.task === "Final global audit of complete story" && audit++ === 0)
         return {
-          ok: true,
+          ok: true as const,
           text: JSON.stringify({
             ...passReview,
             checks: { ...passReview.checks, continuity: false },

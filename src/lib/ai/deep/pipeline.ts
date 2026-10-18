@@ -8,7 +8,7 @@ import { runStructuredStory, type StoryStore } from "./story-run";
 import type { StoryAdapter } from "./story";
 
 export type ChatMsg = { role: "system" | "user" | "assistant"; content: unknown };
-export type CallResult = { ok: true; text: string; finishReason: string | null } | { ok: false; status: number; reason: string };
+export type CallResult = { ok: true; text: string; finishReason: string | null; model?: string; provider?: string } | { ok: false; status: number; reason: string };
 export type ModelCall = (messages: ChatMsg[]) => Promise<CallResult>;
 
 /** Resource limits. budgetMs covers every batch plus review/correction of the largest supported request (work is detached from the browser, see chat-background).

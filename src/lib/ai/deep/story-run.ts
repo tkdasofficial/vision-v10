@@ -157,6 +157,8 @@ export async function runStructuredStory(o: {
       entry.inputTokens = ctx.tokens;
       const r = await (review ? (o.reviewCall ?? o.call) : o.call)(ctx.messages);
       if (!r.ok) throw new Error(`Provider error ${r.status}: ${r.reason}`);
+      entry.model = r.model ?? entry.model;
+      entry.provider = r.provider ?? entry.provider;
       if (r.finishReason === "length")
         throw new Error("Structured output exceeded output limit; not accepted.");
       return r.text;
@@ -216,6 +218,10 @@ export async function runStructuredStory(o: {
         const s = run.scenes[c.id];
         if (!s) {
           issues.push(fail(c.id, "Scene is not approved"));
+          continue;
+        }
+        if (c.dependsOn.some((id) => !run.snapshots[id])) {
+          issues.push(fail(c.id, "A prerequisite scene has not passed validation"));
           continue;
         }
         const v = validateScene(p, c, s, state),
