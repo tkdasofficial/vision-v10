@@ -293,7 +293,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
       // While running: the work-state line only — no intro sentence, no card.
       const content = !isTerminal(job.status) ? "" : job.status === "failed" || job.status === "timed_out" ? `That didn't work: ${job.error ?? "unknown error"}` : job.status === "cancelled" ? "Task cancelled." : hasDeliveredFile(job) ? done : "";
       const msg: ChatMessageType = { id: msgId, role: "assistant", content, timestamp: new Date(), job };
-      return prev.some((m) => m.id === msgId) ? prev.map((m) => (m.id === msgId ? msg : m)) : [...prev, msg];
+      return prev.some((m) => m.id === msgId) ? prev.map((m) => (m.id === msgId ? { ...msg, deleted: m.deleted } : m)) : [...prev, msg];
     });
     try { const finalJob = await runJob(type, files ? { files, prompt: String(input.prompt ?? ""), sessionId } : { input, sessionId }, show, jobId); trackJob(jobId, !isTerminal(finalJob.status)); }
     catch (e: any) { trackJob(jobId, false); setMessages((prev) => [...prev.filter((m) => m.id !== msgId), { id: msgId, role: "assistant", content: `Sorry, that task couldn't start: ${e.message}`, timestamp: new Date() }]); }
