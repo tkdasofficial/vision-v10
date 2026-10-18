@@ -36,7 +36,7 @@ const TypingIndicator = forwardRef<HTMLDivElement, Props>(({ phase = "thinking",
   const dotStr = ".".repeat(dots);
 
   return (
-    <div ref={ref} role="status" aria-live="polite" className="mx-auto w-full max-w-2xl animate-fade-in px-4 py-2">
+    <div ref={ref} role="status" aria-live="polite" className="mx-auto w-full max-w-2xl animate-fade-in px-3 sm:px-4 md:px-6 py-3">
       <span key={label} className="animate-fade-in text-sm font-medium text-foreground">{label}<span className="text-muted-foreground">{dotStr}</span></span>
     </div>
   );

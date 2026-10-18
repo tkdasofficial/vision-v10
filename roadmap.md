@@ -1,5 +1,8 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Consistent terminal status position
+- [x] Shared compact terminal status across normal/private replies, Deep and completed file jobs; real elapsed time persists even without stage history. Immediate reply save prevents reload dropping duration. Signed-in normal task returned 42 and Worked for 2s, retained after immediate reload; Deep restored Worked for 96s exactly once; failed workbook expanded Failed after 210s → Generating; saved workbook shows one success summary and download. Phone 360×581 inspected with no overflow. Full suite: 1,460 passed, one skipped; automatic build OK. No backend deployment.
+
 ## Current request — Story consistency PRD and compact task UI
 - [x] Integrated canonical blueprint/scene contracts, dependency closure, evidence-gated state, provider token gates, bounded repair, dependent revalidation, final audit and namespaced saved reports into the existing Deep story branch; no migration/deployment. Configuration/limitations recorded in docs/story-consistency.md.
 - [x] Replaced 64px Deep status card and terminal job cards with text; failed elapsed time expands recorded step details. Signed-in old workbook failure: Failed after 210s → Generating; reload preserves duration. Desktop/mobile inspected; saved XLSX download valid with five sheets/three charts. Real three-scene chat shows compact Planning and completes in 96s through current external service.
@@ -64,6 +67,9 @@
 - [x] Verified live Worker has SANDBOX_DB binding; long-context chat jobs use it. Standalone sandbox screen is not requested.
 
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
+
+## Current request — Consistent terminal status position
+- [ ] Unify normal, Deep and file task outcomes at their existing status position with frozen elapsed seconds; preserve failure details and downloads; verify real chat and regressions.
 
 ## Current request — Private Google Drive storage
 - [x] Audit output capabilities and storage paths; reconcile 115 canonical writable formats.

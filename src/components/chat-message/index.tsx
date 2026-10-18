@@ -12,6 +12,7 @@ import FileCreatorCard from "@/components/file-creator-card";
 import UserMessage from "@/components/chat/user-message";
 import DocumentCard from "@/components/chat/document-card";
 import { Button } from "@/components/ui/button";
+import TaskStatus from "@/components/task-status";
 
 type Props = { message: ChatMessageType; isNew?: boolean };
 
@@ -20,32 +21,7 @@ type Props = { message: ChatMessageType; isNew?: boolean };
  * to the operations that actually ran. Seconds are the real measured duration; the row only
  * renders when the server reported real stages.
  */
-const ActivityRow = ({ activity }: { activity: { seconds: number; steps: string[] } }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="text-xs text-muted-foreground">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex items-center gap-1.5 py-0.5 hover:text-foreground transition-colors"
-      >
-        <ChevronRight className={cn("w-3 h-3 transition-transform", open && "rotate-90")} />
-        <span>Worked for {activity.seconds}s</span>
-      </button>
-      {open && (
-        <ol className="mt-1 ml-4 space-y-0.5 border-l border-border pl-3">
-          {activity.steps.map((step, i) => (
-            <li key={i} className="flex items-center gap-1.5">
-              <Check className="w-3 h-3 text-muted-foreground/70" />
-              <span>{step}</span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </div>
-  );
-};
+const ActivityRow = ({ activity }: { activity: NonNullable<ChatMessageType["activity"]> }) => <TaskStatus label="" startedAt={new Date(0)} finished seconds={activity.seconds} failed={activity.failed} details={[...(activity.detail ? [activity.detail] : []), ...activity.steps]} />;
 
 const getMessageSize = (content: string) => {
   if (content.length < 60) return "short";
@@ -318,7 +294,8 @@ const ChatMessage = forwardRef<HTMLDivElement, Props>(({ message, isNew = false 
         <div className="group relative w-full">
           <div className="space-y-3">
             {/* Finished-task summary ("Worked for Ns") sits above the results, expandable to the real steps. */}
-            {message.activity && typingDone && message.deep?.stage !== "failed" && <ActivityRow activity={message.activity} />}
+            {!message.job && message.activity && <ActivityRow activity={{ ...message.activity, failed: message.activity.failed || message.deep?.stage === "failed", detail: message.deep?.detail ?? message.activity.detail }} />}
+            {!message.job && !message.activity && message.deep && (message.deep.stage === "done" || message.deep.stage === "failed") && <ActivityRow activity={{ seconds: message.deep.seconds ?? 0, steps: [], failed: message.deep.stage === "failed", detail: message.deep.detail }} />}
             {message.imageUrl && (
               <img
                 src={message.imageUrl}
@@ -330,7 +307,7 @@ const ChatMessage = forwardRef<HTMLDivElement, Props>(({ message, isNew = false 
             {/* Render segments: text → task card → text */}
             {message.document && <DocumentCard id={message.document.id} title={message.document.title} />}
             {message.deep && <DeepReply message={message} />}
-            {message.content && !message.deep && !message.document && !(message.job?.type === "code_export" && message.job.status !== "failed") && segments.map((seg, i) => {
+            {message.content && !message.deep && !message.document && !message.job && segments.map((seg, i) => {
               const displayed = seg.content.slice(0, charCounts[i] ?? seg.content.length);
               const isActive = activeSegIdx === i;
               const segVisible = charCounts[i] > 0 || !shouldAnimate;
@@ -472,7 +449,7 @@ const DeepReplyContent = ({ message, deep }: { message: ChatMessageType; deep: N
   const { title, body } = useMemo(() => splitDeepTitle(message.content || ""), [message.content]);
   return (
     <div className="w-full space-y-3">
-      {!done && <DeepStatusCard stage={stage} seconds={deep.seconds} detail={deep.detail} />}
+      {stage !== "done" && stage !== "failed" && <DeepStatusCard stage={stage} seconds={deep.seconds} detail={deep.detail} />}
       {(done || stage === "failed") && message.content && (
         <article className="animate-fade-in pt-2">
           {title && <h2 className="font-display text-2xl sm:text-[28px] font-bold leading-tight tracking-tight text-foreground py-4">{title}</h2>}
