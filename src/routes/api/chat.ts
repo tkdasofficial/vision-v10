@@ -274,7 +274,9 @@ export const Route = createFileRoute("/api/chat")({
                 console.error("[chat:deep]", { category: "internal_error" });
                 outcome = { status: "failed", error: "Internal error" };
                 providerProgress?.("failed", "Internal error");
-                put(sseChunk("Deep Thinking stopped because of an internal error — no verified answer was produced."));
+                const errorText = "Deep Thinking stopped because of an internal error — no verified answer was produced.";
+                await saveReply(caller.user.id, chatId, requestId, errorText, { executionMode: task.executionMode, deep: { stage: "failed", detail: "Internal error" } }).catch(() => {});
+                put(sseChunk(errorText));
               } finally {
                 await gen?.finish(outcome.status, outcome.error);
                 clearInterval(ping);
@@ -365,6 +367,7 @@ export const Route = createFileRoute("/api/chat")({
               }
               if (!best) {
                 emit("failed", finalFailure);
+                await saveReply(caller.user.id, chatId, taskId, finalFailure, { executionMode: task.executionMode, deep: { stage: "failed", detail: finalFailure } });
                 send(`data: ${JSON.stringify({ choices: [{ delta: { content: finalFailure } }] })}\n\n`);
                 return;
               }
@@ -407,6 +410,7 @@ export const Route = createFileRoute("/api/chat")({
             } catch (e) {
               console.error("[chat:task]", { category: "internal_error" });
               emit("failed", "Internal error");
+              await saveReply(caller.user.id, chatId, taskId, "The request stopped because of an internal error.", { executionMode: task.executionMode, deep: { stage: "failed", detail: "Internal error" } }).catch(() => {});
               send(`data: ${JSON.stringify({ vision_error: { message: "The request stopped because of an internal error." } })}\n\n`);
             } finally {
               await gen?.finish(outcome.status, outcome.error);
