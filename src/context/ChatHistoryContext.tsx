@@ -147,6 +147,7 @@ export function rowsToConversation(rows: any[]): ChatMessage[] {
   const msgs = sorted.map((x) => rowToMessage(x.r));
   const seen = new Set<string>();
   return msgs.filter((m, i) => {
+    if (m.deleted || m.archivedJob) return true;
     const key = `${m.role}\u0000${m.content}\u0000${m.imageUrl ?? ""}`;
     const dup = seen.has(key);
     seen.add(key);

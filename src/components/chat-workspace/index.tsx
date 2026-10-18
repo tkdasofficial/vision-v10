@@ -730,7 +730,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
                 fallbackSeconds={Math.max(0, (new Date(msg.timestamp).getTime() - new Date(messages.slice(0, messages.indexOf(msg)).findLast((m) => m.role === "user")?.timestamp ?? msg.timestamp).getTime()) / 1000)}
                 onDelete={handleDeleteReply}
                 onBranch={handleBranchReply}
-                onReport={handleReportReply}
+                onReport={isIncognito ? undefined : handleReportReply}
               />
             ))}
             {jobRestoreError && <div role="alert" className="mx-auto flex max-w-2xl flex-wrap items-center gap-2 px-3 py-3 text-sm text-muted-foreground"><span>Couldn't load saved results.</span><Button variant="secondary" size="sm" onClick={() => setJobRestoreAttempt((n) => n + 1)}>Try again</Button></div>}

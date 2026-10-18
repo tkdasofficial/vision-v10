@@ -20,6 +20,12 @@ const flowLanguages = new Set(["flow", "steps", "pipeline"]);
 const safeHref = (href?: string) => (href && /^(https?:|mailto:|#|\/)/i.test(href.trim()) ? href : undefined);
 
 const components: Components = {
+  // TableReply needs native section/row/cell children, not Streamdown's tool wrappers.
+  thead: ({ children }) => <thead>{children}</thead>,
+  tbody: ({ children }) => <tbody>{children}</tbody>,
+  tr: ({ children }) => <tr>{children}</tr>,
+  th: ({ children, style }) => <th style={style}>{children}</th>,
+  td: ({ children, style }) => <td style={style}>{children}</td>,
   pre: ({ children, node }) => {
     const child = Children.toArray(children).find((item) => isValidElement(item));
     if (!isValidElement<{ children?: ReactNode; className?: string }>(child)) return <pre>{children}</pre>;
