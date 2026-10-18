@@ -3,7 +3,8 @@ import type { JobType, JobView } from "./statuses";
 import { isTerminal } from "./statuses";
 
 async function json(res: Response) {
-  const body: any = await res.json().catch(() => ({}));
+  const body: any = await res.json().catch(() => null);
+  if (!body || typeof body !== "object") throw new Error(`The backend returned an unreadable response (${res.status}). Please try again.`);
   if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
   return body;
 }
@@ -15,7 +16,9 @@ export async function fetchJob(id: string): Promise<JobView | null> {
 }
 
 export async function listJobs(sessionId?: string): Promise<JobView[]> {
-  return (await json(await fetch(sessionId ? `/api/jobs?session=${encodeURIComponent(sessionId)}` : "/api/jobs", { credentials: "include", cache: "no-store" }))).jobs;
+  const body = await json(await fetch(sessionId ? `/api/jobs?session=${encodeURIComponent(sessionId)}` : "/api/jobs", { credentials: "include", cache: "no-store" }));
+  if (!Array.isArray(body.jobs)) throw new Error("Saved results could not be read. Please try again.");
+  return body.jobs;
 }
 
 /** Starts a job; `onUpdate` receives each polled status while the server works. */
@@ -56,7 +59,8 @@ export async function runJob(type: JobType, payload: { input?: unknown; file?: F
       let j: JobView | null = job;
       while (j && !isTerminal(j.status) && Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 2000));
-        j = await fetchJob(id).catch(() => null);
+        // A failed read is not a missing job: preserve the last accepted state.
+        j = await fetchJob(id).catch(() => j);
         if (j) onUpdate(j);
       }
       done = true;
@@ -89,7 +93,7 @@ export async function retryJob(id: string, onUpdate: (j: JobView) => void): Prom
       let j: JobView | null = job;
       while (j && !isTerminal(j.status) && Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 2000));
-        j = await fetchJob(newId).catch(() => null);
+        j = await fetchJob(newId).catch(() => j);
         if (j) onUpdate(j);
       }
       return j ?? job;
