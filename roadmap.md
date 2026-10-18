@@ -1,8 +1,9 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
 ## Current request — GitHub runtime provider selection
-- [ ] Switch background story primary to the officially verified NVIDIA Nemotron 3 Super ID; retain Groq GPT-OSS 120B fallback and existing GitHub-secret wiring.
-- [ ] Run runtime regression tests, update the runtime repository and verify a real signed-in request; report any rate-limit blocker honestly.
+- [x] Switched runtime/story.py to NVIDIA nvidia/nemotron-3-super-120b-a12b; retained Groq openai/gpt-oss-120b fallback and verified both GitHub-secret names. Removed optional cap only for the upgraded primary. Runtime repository updated through GitHub API; no Worker deployment or preview URL change.
+- [x] 22 runtime regressions passed; GitHub runtime-tests succeeded. Signed-in exact ten-scene request completed in 1123s; GitHub run 39119335115 succeeded. Chat c029bdf4-fbee-4395-a62d-2c72cb60d63c restored after closing/reopening; story.md downloaded twice (155302 bytes, blueprint + exactly scenes 1–10, all ten sections each, Devanagari present in each scene, no Devanagari in visual prompts).
+- [x] Verification limits recorded: one combined Markdown download rather than ten separate files; reopening also shows duplicated full-story replies/statuses. Independent scene-copy controls, exhaustive language and narrative continuity compliance are not claimed verified or repaired by this model-selection request.
 
 ## Current request — Backend connection and saved-results error handling
 - [x] Active Cloudflare version b2d22d24-bd01-4f39-857d-69bb82b1c87c receives 100% traffic (deployed 2026-10-18 05:45:38 UTC). DB/SANDBOX_DB/AI/ASSETS/SMTP bindings, preview origins and required table names verified read-only; no deployment/resource/secret changes this turn.
@@ -153,13 +154,13 @@ Spec: user-uploaded VISION memory/output/artifact/activity integration doc (5 ta
 - Root cause of failed Excel run: Cloudflare Worker ran old code (10-record catalog path). Fixed by packaging in /tmp and `npx wrangler deploy` → version ae7052d8. Re-run job 9710277d completed; 500 rows, 5 sheets, 3 charts, 1,745 formulas, 0 errors after recalculation.
 
 ## Current request — Hybrid Execution PRD: story tasks on GitHub Actions runtime
-- [ ] Add `story_generate` op to vision-runtime (blueprint → N scenes → validate/retry → assemble; NVIDIA Nemotron primary, Groq GPT-OSS 120B fallback via repo secrets; checkpointed progress via relay).
-- [ ] App: register op in operations.ts; no-input support in runtime.server.ts; story stages in relay; /api/chat routes story requests to runtime dispatch; finalize saves markdown artifact + chat reply.
-- [ ] github.server.ts reads GITHUB_PAT via getSecret; install GITHUB_PAT Worker secret (value never printed).
-- [ ] run-job.yml: add story_generate choice + provider secrets env for that op only.
-- [ ] Tests (app + runtime repo), deploy Worker, push runtime repo, verify real 10-scene story end-to-end.
+- [x] Add `story_generate` op to vision-runtime (blueprint → N scenes → validate/retry → assemble; NVIDIA Nemotron primary, Groq GPT-OSS 120B fallback via repo secrets; checkpointed progress via relay).
+- [x] App: register op in operations.ts; no-input support in runtime.server.ts; story stages in relay; /api/chat routes story requests to runtime dispatch; finalize saves markdown artifact + chat reply.
+- [x] github.server.ts reads GITHUB_PAT via getSecret; install GITHUB_PAT Worker secret (value never printed).
+- [x] run-job.yml: add story_generate choice + provider secrets env for that op only.
+- [x] Tests (app + runtime repo), deploy Worker, push runtime repo, verify real 10-scene story end-to-end — generation/download pass; output-format and duplicate-reply limitations above remain.
 - [x] story_generate op added to vision-runtime (blueprint→scenes→validate/retry→assemble; NVIDIA→Groq; checkpointed); pushed to GitHub via API; 20 runtime tests pass.
 - [x] App: story_generate registered (no-input), story stages in relay, /api/jobs JSON path, request-route kind "story", chat-workspace dispatches runtime_task; finalize saves Drive artifact + full story as chat reply. GITHUB_PAT installed as Worker secret; github.server.ts uses getSecret. Full suite 1,482 passed.
 - [x] Fixed login blocker: security hash key now reads Worker secrets via getSecret with SIGNING_KEY fallback ("Security is not configured" gone; password step verified).
 - [x] Worker deployed: 960630d3-beb1-4635-a2dd-6524aadeda51.
-- [ ] End-to-end: signed-in 10-scene story run in progress at wrap-up; confirm completion + chat reply + download next turn.
+- [x] End-to-end completed with updated primary on 2026-10-18: Worked for 1123s, saved account-owned story.md, reopened chat and working download; no full PRD-compliance claim.
