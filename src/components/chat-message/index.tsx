@@ -13,7 +13,7 @@ import UserMessage from "@/components/chat/user-message";
 import DocumentCard from "@/components/chat/document-card";
 import { Button } from "@/components/ui/button";
 import TaskStatus from "@/components/task-status";
-import { MessageActions, MessageAction } from "@/components/ai-elements/message";
+import { MessageActions, MessageAction } from "@/components/ai-elements/message-actions";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { replyText } from "@/lib/reply-actions";
 
