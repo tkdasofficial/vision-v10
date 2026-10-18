@@ -1,6 +1,7 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
 ## Current request — Every reply status and actions
+- [ ] Diagnose and fix “Couldn't load saved results” in the existing signed-in preview.
 - [ ] Keep one status at the top of every AI reply, including saved/file/failed responses.
 - [ ] Add Copy, Speak, Share and a menu with Report, Delete Message and Create Branch; preserve saved history and incognito privacy.
 - [ ] Verify signed-in actions, reload persistence and compact phone layout without deployment.
