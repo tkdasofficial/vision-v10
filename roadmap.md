@@ -1,5 +1,9 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — GitHub runtime provider selection
+- [ ] Switch background story primary to the officially verified NVIDIA Nemotron 3 Super ID; retain Groq GPT-OSS 120B fallback and existing GitHub-secret wiring.
+- [ ] Run runtime regression tests, update the runtime repository and verify a real signed-in request; report any rate-limit blocker honestly.
+
 ## Current request — Backend connection and saved-results error handling
 - [x] Active Cloudflare version b2d22d24-bd01-4f39-857d-69bb82b1c87c receives 100% traffic (deployed 2026-10-18 05:45:38 UTC). DB/SANDBOX_DB/AI/ASSETS/SMTP bindings, preview origins and required table names verified read-only; no deployment/resource/secret changes this turn.
 - [x] Reproduced authenticated HTTP 200 /api/jobs failing with double Brotli decompression. Proxy requests identity encoding and removes decoded encoding headers for JSON/SSE/downloads. Saved-result errors preserve safe server reasons; malformed responses fail explicitly; accepted start/retry polling retains state across transient errors. Six new regressions; full suite 1,475 passed/one skipped; automatic build OK.
