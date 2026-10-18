@@ -9,7 +9,10 @@ export type ProviderEvent = { stage: "retrying" | "switching_provider"; provider
 export type ProviderPolicy = "fallback" | "input" | "cancelled";
 export function providerPolicy(status: number, reason: string): ProviderPolicy {
   if (status === 499) return "cancelled";
-  if (status === 400 || status === 413 || status === 422) return "input";
+  // 413 is provider-specific (each provider has its own payload limit), so the chain
+  // falls through to the next provider; it only becomes an input error if every
+  // provider rejects the payload (handled in orchestrateText).
+  if (status === 400 || status === 422) return "input";
   // A provider credential failure is not an app-user authorization failure (checked before calling here).
   if (status === 403 && /content.?policy|safety|refusal/i.test(reason)) return "input";
   return "fallback";
@@ -24,6 +27,7 @@ export async function orchestrateText(messages: unknown[], opts: {
   const deadlineAt = opts.deadlineAt ?? Date.now() + AI_LIMITS.providerChainMs;
   const models = opts.models ?? TEXT_CHAIN;
   const call = opts.call ?? streamFromProvider;
+  let inputRejected: { status: number; reason: string } | null = null;
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
     if (opts.signal.aborted) return { ok: false, status: 499, reason: "Request cancelled." };
@@ -51,10 +55,15 @@ export async function orchestrateText(messages: unknown[], opts: {
       status = result.status;
       category = failureCategory(status, result.reason);
       const policy = providerPolicy(status, result.reason);
-      if (policy !== "fallback") return { ok: false, status, reason: policy === "cancelled" ? "Request cancelled." : "The AI request is invalid or unsupported. Please check the input and required format." };
+      if (policy === "cancelled") return { ok: false, status, reason: "Request cancelled." };
+      // A provider-specific payload limit (413) must not kill the chain: another provider may
+      // accept the same request. Only when no provider succeeds do we surface the input error.
+      if (policy === "input" && status !== 413) return { ok: false, status, reason: "The AI request is invalid or unsupported. Please check the input and required format." };
+      if (status === 413) inputRejected = { status, reason: result.reason };
     }
     console.log(JSON.stringify({ tag: "[ai:orchestration]", taskId: opts.taskId, provider: model.provider, model: model.model, attempt: i + 1, outcome: "fallback", status, category, ms: Date.now() - started }));
   }
   console.log(JSON.stringify({ tag: "[ai:orchestration]", taskId: opts.taskId, outcome: "exhausted" }));
+  if (inputRejected) return { ok: false, status: 413, reason: "The request is too large for the available AI providers. Please shorten it or split it into smaller parts." };
   return { ok: false, status: 503, reason: ALL_PROVIDERS_UNAVAILABLE };
 }
