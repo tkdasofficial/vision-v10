@@ -1,5 +1,6 @@
 import { Children, isValidElement, useMemo, type ReactNode } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
+import { type Components } from "react-markdown";
+import { MessageResponse } from "@/components/ai-elements/message";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -45,5 +46,5 @@ const components: Components = {
 
 export default function MarkdownReply({ children }: { children: string }) {
   const source = useMemo(() => normalizeMath(dedupeDeliverables(children)), [children]);
-  return <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkCallouts]} rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: "ignore", output: "htmlAndMathml" }]]} components={{ ...components, table: ({ children: tableChildren, node }) => <TableReply node={node} markdown={source.slice(node?.position?.start.offset ?? 0, node?.position?.end.offset ?? source.length)}>{tableChildren}</TableReply> }}>{source}</ReactMarkdown>;
+  return <MessageResponse mode="static" parseIncompleteMarkdown={false} plugins={{}} controls={false} remarkPlugins={[remarkGfm, remarkMath, remarkCallouts]} rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: "ignore", output: "htmlAndMathml" }]]} components={{ ...components, table: ({ children: tableChildren, node }) => <TableReply node={node} markdown={source.slice(node?.position?.start.offset ?? 0, node?.position?.end.offset ?? source.length)}>{tableChildren}</TableReply> }}>{source}</MessageResponse>;
 }
