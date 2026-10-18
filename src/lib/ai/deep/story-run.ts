@@ -131,6 +131,7 @@ export async function runStructuredStory(o: {
   };
   run.status = "running";
   run.issues = [];
+  run.configuration = { maxRepairs, budgetMs };
   const save = async () => {
     run.updatedAt = now();
     await o.store?.save(run);

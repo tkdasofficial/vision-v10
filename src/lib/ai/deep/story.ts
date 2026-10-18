@@ -173,6 +173,13 @@ export function validateStoryPlan(p: StoryPlan, count: number): StoryIssue[] {
   const values = Object.fromEntries(
     p.blueprint.initialState.map((f) => [stateKey(f.entityId, f.field), f.value]),
   );
+  const initialKeys = p.blueprint.initialState.map((f) => stateKey(f.entityId, f.field));
+  unique(initialKeys, "initial state");
+  for (const f of p.blueprint.initialState) {
+    if (!entities.has(f.entityId)) add("initial state", `Unknown entity ${f.entityId}`);
+    const key = stateKey(f.entityId, f.field);
+    if (canon.has(key) && canon.get(key) !== f.value) add("initial state", "Initial state contradicts immutable canon");
+  }
   for (const s of p.manifest) {
     for (const f of s.before)
       if (values[stateKey(f.entityId, f.field)] !== f.value)

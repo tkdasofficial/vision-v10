@@ -1,9 +1,10 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
 ## Current request — Story consistency PRD and compact task UI
-- [ ] Integrate canonical blueprint, scene contracts/dependencies, validated state, token-aware context, validation/repair/audit and saved reports into existing story pipeline.
-- [ ] Replace large task cards with status text; failed elapsed time expands actual failed-step details; preserve saved file downloads.
-- [ ] Add regression/integration tests and repeatable 10/25/50-scene benchmark; verify preview and report measured results and external blockers.
+- [x] Integrated canonical blueprint/scene contracts, dependency closure, evidence-gated state, provider token gates, bounded repair, dependent revalidation, final audit and namespaced saved reports into the existing Deep story branch; no migration/deployment. Configuration/limitations recorded in docs/story-consistency.md.
+- [x] Replaced 64px Deep status card and terminal job cards with text; failed elapsed time expands recorded step details. Signed-in old workbook failure: Failed after 210s → Generating; reload preserves duration. Desktop/mobile inspected; saved XLSX download valid with five sheets/three charts. Real three-scene chat shows compact Planning and completes in 96s through current external service.
+- [x] Added parser/schema/state/dependency/token/repair/resume/provider regressions and repeatable 10/25/50-scene mock-model benchmarks; no model quality score claimed.
+- [ ] Activate/verify updated story backend and real multi-model 10/25/50-scene baseline comparison — blocked: unchanged preview forwards APIs to existing Cloudflare Worker; local server edits are not executing there. Production deployment prohibited; no authorized updated development runtime supplied. Loss-aware global-audit windows, interactive blocking clarifications and provider usage/cost reporting depend on real provider evaluation/capability telemetry; limitations documented, PRD not claimed complete.
 
 ## Current request — Restore file results after leaving/reloading
 - [x] Signed-in inspection found completed job 9710277d with registered XLSX; mobile button overflow reproduced. Restore requests silently failed without retry; closing during the 800ms question-save delay could lose the question.

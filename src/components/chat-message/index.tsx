@@ -472,7 +472,7 @@ const DeepReplyContent = ({ message, deep }: { message: ChatMessageType; deep: N
   const { title, body } = useMemo(() => splitDeepTitle(message.content || ""), [message.content]);
   return (
     <div className="w-full space-y-3">
-      <DeepStatusCard stage={stage} seconds={deep.seconds} detail={deep.detail} />
+      {!done && <DeepStatusCard stage={stage} seconds={deep.seconds} detail={deep.detail} />}
       {(done || stage === "failed") && message.content && (
         <article className="animate-fade-in pt-2">
           {title && <h2 className="font-display text-2xl sm:text-[28px] font-bold leading-tight tracking-tight text-foreground py-4">{title}</h2>}
