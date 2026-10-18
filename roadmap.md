@@ -1,5 +1,10 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Backend connection and saved-results error handling
+- [ ] Verify active Cloudflare deployment, bindings and preview-to-backend connection without changing hosting or data.
+- [ ] Diagnose and repair saved-results loading and misleading connection errors; add focused regression tests.
+- [ ] Verify signed-in saved results, download and reload; report exact checks and remaining limitations.
+
 ## Current request — Background workers
 - [x] Chat, files and sandbox resolve runtime lifetime before starting work, then register synchronously; SSE start no longer waits for completion before delivering status. Proxy drain is also registered. Missing Worker lifetime fails before acceptance; reply storage failure cannot count as completed; normal/deep error replies persist when storage is available.
 - [x] Signed-in task ab607098-01f6-4367-afb2-4f5ed327f545 started, page closed before completion, reopened and reloaded: complete 12-item answer restored with Worked for 63s. 61 targeted tests and full suite 1,470 passed/one skipped; automatic build OK. Preview URL unchanged; no deployment.
