@@ -1,6 +1,5 @@
 import { Children, isValidElement, useMemo, type ReactNode } from "react";
-import { type Components } from "react-markdown";
-import { MessageResponse } from "@/components/ai-elements/message";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -20,12 +19,6 @@ const flowLanguages = new Set(["flow", "steps", "pipeline"]);
 const safeHref = (href?: string) => (href && /^(https?:|mailto:|#|\/)/i.test(href.trim()) ? href : undefined);
 
 const components: Components = {
-  // TableReply needs native section/row/cell children, not Streamdown's tool wrappers.
-  thead: ({ children }) => <thead>{children}</thead>,
-  tbody: ({ children }) => <tbody>{children}</tbody>,
-  tr: ({ children }) => <tr>{children}</tr>,
-  th: ({ children, style }) => <th style={style}>{children}</th>,
-  td: ({ children, style }) => <td style={style}>{children}</td>,
   pre: ({ children, node }) => {
     const child = Children.toArray(children).find((item) => isValidElement(item));
     if (!isValidElement<{ children?: ReactNode; className?: string }>(child)) return <pre>{children}</pre>;
@@ -52,5 +45,7 @@ const components: Components = {
 
 export default function MarkdownReply({ children }: { children: string }) {
   const source = useMemo(() => normalizeMath(dedupeDeliverables(children)), [children]);
-  return <MessageResponse mode="static" parseIncompleteMarkdown={false} plugins={{}} controls={false} remarkPlugins={[remarkGfm, remarkMath, remarkCallouts]} rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: "ignore", output: "htmlAndMathml" }]]} components={{ ...components, table: ({ children: tableChildren, node }) => <TableReply node={node} markdown={source.slice(node?.position?.start.offset ?? 0, node?.position?.end.offset ?? source.length)}>{tableChildren}</TableReply> }}>{source}</MessageResponse>;
+  // Scoped AI Elements exception: Streamdown drops TableReply's nested row children
+  // (table-generation and currency regressions). Keep the source-position-aware renderer.
+  return <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkCallouts]} rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: "ignore", output: "htmlAndMathml" }]]} components={{ ...components, table: ({ children: tableChildren, node }) => <TableReply node={node} markdown={source.slice(node?.position?.start.offset ?? 0, node?.position?.end.offset ?? source.length)}>{tableChildren}</TableReply> }}>{source}</ReactMarkdown>;
 }
