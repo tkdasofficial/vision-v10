@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const TYPES = ["code_export", "project_generate", "zip_analyze", "agent_task", "long_context"] as const;
+const TYPES = ["code_export", "project_generate", "zip_analyze", "agent_task", "long_context", "runtime_task"] as const;
 const MAX_AGENT_FILES = 10, MAX_AGENT_BYTES = 25 * 1024 * 1024;
 
 // Jobs API: list the caller's jobs, or start one (JSON for code/projects, multipart for ZIP uploads).
@@ -71,6 +71,18 @@ export const Route = createFileRoute("/api/jobs")({
         if (!body || !ID_RE.test(String(body.id)) || !TYPES.includes(body.type) || body.type === "zip_analyze") return Response.json({ error: "Invalid request." }, { status: 400 });
         const i = body.input ?? {};
         if (typeof i.prompt === "string" && i.prompt.length > 80000) return Response.json({ error: "The referenced content is too large for this task." }, { status: 413 });
+        // Prompt-only background operations (story generation) arrive as JSON without a file.
+        if (body.type === "runtime_task") {
+          if (i.operation !== "story_generate") return Response.json({ error: "Invalid request." }, { status: 400 });
+          const prompt = str(i.params?.prompt, 60000);
+          if (!prompt?.trim()) return Response.json({ error: "Tell me what to write." }, { status: 400 });
+          try {
+            const job = await startJob(caller.user.id, body.id, "runtime_task", { operation: "story_generate", params: { prompt }, fileName: "story.md", mime: "text/markdown" }, 1, sessionOf(body.sessionId));
+            return Response.json({ job });
+          } catch (e: any) {
+            return Response.json({ error: /UNIQUE/i.test(String(e?.message)) ? "This task already exists." : "Could not start the task." }, { status: 409 });
+          }
+        }
         const input = body.type === "agent_task" || body.type === "long_context" ? { prompt: str(i.prompt, 80000) ?? "" } : body.type === "code_export"
           ? { prompt: str(i.prompt, 8000), language: str(i.language, 30), filename: str(i.filename, 120), code: str(i.code, 500_000) }
           : { prompt: str(i.prompt, 8000) ?? "", stack: str(i.stack, 30), name: str(i.name, 60) };

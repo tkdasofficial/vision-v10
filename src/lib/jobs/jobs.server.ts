@@ -21,11 +21,12 @@ export class JobRun {
   steps: JobStep[] = [];
   warnings: string[] = [];
   readonly startedAt = Date.now();
+  sessionId: string | null = null;
   constructor(public id: string, public userId: string) {}
   /** One structured line per finished job: outcome, timing and counts only — never inputs, outputs or file contents. */
   private diag(outcome: string, extra: Record<string, unknown> = {}) { console.log(JSON.stringify({ tag: "[job]", jobId: this.id, outcome, ms: Date.now() - this.startedAt, steps: this.steps.length, warnings: this.warnings.length, ...extra })); }
   /** Rebuilds a JobRun from a stored row so later processes can keep appending real steps. */
-  static restore(r: any) { const j = new JobRun(r.id, r.user_id); j.steps = JSON.parse(r.steps || "[]"); j.warnings = JSON.parse(r.warnings || "[]"); return j; }
+  static restore(r: any) { const j = new JobRun(r.id, r.user_id); j.steps = JSON.parse(r.steps || "[]"); j.warnings = JSON.parse(r.warnings || "[]"); j.sessionId = r.session_id ?? null; return j; }
   async cancelled() { await this.fail(new CancelledError()); }
   async timedOut(message: string) {
     this.closeLast("error");

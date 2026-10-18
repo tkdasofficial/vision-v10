@@ -147,3 +147,10 @@ Spec: user-uploaded VISION memory/output/artifact/activity integration doc (5 ta
 - [x] In-chat workbook delivery — live older Worker interrupted the task; independently verified workbook delivered in Files, full signed-in download flow remains unverified.
 
 - Root cause of failed Excel run: Cloudflare Worker ran old code (10-record catalog path). Fixed by packaging in /tmp and `npx wrangler deploy` → version ae7052d8. Re-run job 9710277d completed; 500 rows, 5 sheets, 3 charts, 1,745 formulas, 0 errors after recalculation.
+
+## Current request — Hybrid Execution PRD: story tasks on GitHub Actions runtime
+- [ ] Add `story_generate` op to vision-runtime (blueprint → N scenes → validate/retry → assemble; NVIDIA Nemotron primary, Groq GPT-OSS 120B fallback via repo secrets; checkpointed progress via relay).
+- [ ] App: register op in operations.ts; no-input support in runtime.server.ts; story stages in relay; /api/chat routes story requests to runtime dispatch; finalize saves markdown artifact + chat reply.
+- [ ] github.server.ts reads GITHUB_PAT via getSecret; install GITHUB_PAT Worker secret (value never printed).
+- [ ] run-job.yml: add story_generate choice + provider secrets env for that op only.
+- [ ] Tests (app + runtime repo), deploy Worker, push runtime repo, verify real 10-scene story end-to-end.

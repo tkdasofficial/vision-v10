@@ -18,7 +18,8 @@ const ISSUER = "https://token.actions.githubusercontent.com";
 const AUDIENCE = "vision-runtime-relay";
 const SESSION_TTL_MS = 40 * 60 * 1000;
 const MAX_OUTPUT_CHUNKS = 160; // x 700 KB ≈ 110 MB hard ceiling; per-operation limits are enforced by the app
-const STAGES = new Set(["validating_input", "processing", "validating_output", "uploading_output"]);
+const STAGES = new Set(["validating_input", "processing", "validating_output", "uploading_output", "planning", "assembling"]);
+const STAGE_RE = /^writing_scene_\d{1,2}$/;
 const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const enc = new TextEncoder();
@@ -99,7 +100,7 @@ export async function handleRuntime(req: Request, env: RuntimeEnv, path: string)
     }
     if (path === "/runtime/progress" && req.method === "POST") {
       const b: any = await req.json().catch(() => ({}));
-      if (!STAGES.has(b.stage)) return json(400, { error: "bad stage" });
+      if (!STAGES.has(b.stage) && !STAGE_RE.test(String(b.stage))) return json(400, { error: "bad stage" });
       await env.DB.prepare("UPDATE runtime_jobs SET stage = ?, updated_at = ? WHERE job_id = ?").bind(b.stage, now(), job.job_id).run();
       return json(200, { ok: true });
     }

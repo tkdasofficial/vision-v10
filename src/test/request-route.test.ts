@@ -42,3 +42,28 @@ describe("request routing", () => {
     expect(routeRequest(readFileSync(UPLOAD, "utf8"), "default").kind).toBe("chat");
   });
 });
+
+describe("story background routing", () => {
+  it("routes counted scene-prompt story requests to the background runtime", () => {
+    const p = "Generate exactly 10 detailed, sequential scene-generation prompts for a single supernatural horror story set in an abandoned mansion. First, establish a Master Story Blueprint. Each scene must be a separate Markdown document.";
+    expect(routeRequest(p, "default")).toEqual({ kind: "story" });
+  });
+  it("routes counted chapter story requests to the background runtime", () => {
+    expect(routeRequest("Write a story with 5 chapters about a haunted lighthouse", "default")).toEqual({ kind: "story" });
+  });
+  it("keeps ordinary story chat in chat", () => {
+    expect(routeRequest("Tell me a short story about a cat", "default")).toEqual({ kind: "chat" });
+    expect(routeRequest("Generate exactly 10 detailed, sequential scene-generation prompts for a horror story", "deep")).toEqual({ kind: "chat" });
+  });
+});
+
+describe("story_generate runtime params", () => {
+  it("keeps only the prompt for story_generate", async () => {
+    const { cleanParams } = await import("@/lib/runtime/operations");
+    expect(cleanParams("story_generate", { prompt: "a story", target: "x", evil: true })).toEqual({ prompt: "a story" });
+  });
+  it("registers story_generate as a no-input operation", async () => {
+    const { RUNTIME_OPS } = await import("@/lib/runtime/operations");
+    expect(RUNTIME_OPS.story_generate.maxInput).toBe(0);
+  });
+});
