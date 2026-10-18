@@ -327,6 +327,18 @@ export type StoryAdapter = {
   countTokens(text: string): number;
 };
 /** Portable BPE estimate with UTF-8 byte upper bound when the provider tokenizer is not available. */
+// BPE encoding is pure-JS and CPU-expensive; the same large contents (request, blueprint,
+// prior scenes) are counted once per model per call, so cache counts per process.
+const tokenCache = new Map<string, number>();
+const TOKEN_CACHE_MAX = 300;
+function cachedCount(s: string, count: (x: string) => number): number {
+  const hit = tokenCache.get(s);
+  if (hit !== undefined) return hit;
+  const n = count(s);
+  if (tokenCache.size >= TOKEN_CACHE_MAX) tokenCache.delete(tokenCache.keys().next().value!);
+  tokenCache.set(s, n);
+  return n;
+}
 export function storyAdapter(model: string, provider: string): StoryAdapter {
   const gpt = /gpt-oss/.test(model);
   // Published provider context limits; output remains the existing configured 8k allowance.
@@ -342,7 +354,7 @@ export function storyAdapter(model: string, provider: string): StoryAdapter {
     tokenization: gpt
       ? "o200k_harmony BPE estimate (not provider usage)"
       : "UTF-8 byte upper bound; native tokenizer unavailable",
-    countTokens: gpt ? (s) => encode(s).length : (s) => new TextEncoder().encode(s).length,
+    countTokens: gpt ? (s) => cachedCount(s, (x) => encode(x).length) : (s) => new TextEncoder().encode(s).length,
   };
 }
 export function budgetStoryMessages(
