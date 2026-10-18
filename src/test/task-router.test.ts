@@ -16,6 +16,11 @@ describe("modes", () => {
 });
 
 describe("task router (default mode)", () => {
+  it("routes numbered continuous stories through checked generation without changing explicit modes", () => {
+    expect(run("Write 50 scenes about a courier").executionMode).toBe("deep");
+    expect(run("Write 25 chapters about a courier", "coding").executionMode).toBe("coding");
+    expect(run("What are story scenes?").executionMode).toBe("default");
+  });
   it("greetings stay default", () => expect(run("Hi").executionMode).toBe("default"));
   it("deep analysis", () => expect(run("Analyze this difficult problem in depth.").executionMode).toBe("deep"));
   it("research report", () => {

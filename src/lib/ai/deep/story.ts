@@ -322,10 +322,13 @@ export type StoryAdapter = {
 /** Portable BPE estimate with UTF-8 byte upper bound when the provider tokenizer is not available. */
 export function storyAdapter(model: string, provider: string): StoryAdapter {
   const gpt = /gpt-oss/.test(model);
+  // Published provider context limits; output remains the existing configured 8k allowance.
+  // Unknown adapters stay conservative and never inherit another provider's capabilities.
+  const contextTokens = provider === "groq" && gpt ? 131072 : provider === "cf" && gpt ? 128000 : provider === "nvidia" && /nemotron-3-super/.test(model) ? 1000000 : provider === "nvidia" && /nano-omni/.test(model) ? 262144 : 32768;
   return {
     model,
     provider,
-    contextTokens: 32768,
+    contextTokens,
     outputTokens: 8192,
     headroomTokens: 2048,
     schemaMode: "normalized-json",

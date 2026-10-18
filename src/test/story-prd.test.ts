@@ -36,6 +36,13 @@ const options = (count: number, call: ModelCall) => ({
   adapter: storyAdapter("gpt-oss-120b", "groq"),
 });
 describe("story PRD contracts", () => {
+  it("uses provider-specific context limits while keeping configured output headroom", () => {
+    expect(storyAdapter("openai/gpt-oss-120b", "groq").contextTokens).toBe(131072);
+    expect(storyAdapter("@cf/openai/gpt-oss-120b", "cf").contextTokens).toBe(128000);
+    expect(storyAdapter("nvidia/nemotron-3-super-120b-a12b", "nvidia").contextTokens).toBe(1000000);
+    expect(storyAdapter("unknown", "unknown").contextTokens).toBe(32768);
+    expect(storyAdapter("openai/gpt-oss-120b", "groq").outputTokens).toBe(8192);
+  });
   it("requires a complete 50-scene manifest before generation", () => {
     expect(validateStoryPlan(storyFixture(50), 50)).toEqual([]);
     expect(validateStoryPlan(storyFixture(25), 50).some((i) => i.reference === "scene count")).toBe(
