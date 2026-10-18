@@ -36,6 +36,7 @@ import { generationTaskState, endedWithoutAnswer } from "@/lib/ai/generation-sta
 import { useAuth } from "@/context/AuthContext";
 import { readCachedPrefs } from "@/lib/settings";
 import { adoptDraftMode, browserStore, loadChatMode, saveChatMode } from "@/lib/chat-mode-store";
+import { branchReplies, deleteReply, replyText } from "@/lib/reply-actions";
 
 type Props = {
   tool?: AITool;
@@ -87,6 +88,28 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
   const scrollRef = useRef<HTMLDivElement>(null);
   const { addChat, updateChatMessages, persistChatMessages, getChatById } = useChatHistory();
   const projectId = chatId ? getChatById(chatId)?.projectId : draftProjectId;
+  const handleDeleteReply = async (id: string) => {
+    const next = deleteReply(messages, id);
+    if (!isIncognito && chatId) await persistChatMessages(chatId, next);
+    setMessages(next);
+  };
+  const handleBranchReply = async (id: string) => {
+    const next = branchReplies(messages, id);
+    if (!next.length) return;
+    if (isIncognito) { setMessages(next); return; }
+    const branchId = addChat(`${chatTitle || "Chat"} — Branch`, next.find((m) => m.role === "user")?.content.slice(0, 120) || "Branch", tool?.id, projectId);
+    await persistChatMessages(branchId, next);
+    updateChatMessages(branchId, next);
+    // Open through the ordinary saved-chat path, not the draft-created shortcut.
+    navigate(`/chat/${branchId}`);
+  };
+  const handleReportReply = async (id: string) => {
+    if (!user) throw new Error("Sign in to report a reply.");
+    const message = messages.find((m) => m.id === id);
+    if (!message) return;
+    const { error } = await supabase.from("support_tickets").insert({ user_id: user.id, subject: "AI response report", message: `Chat: ${isIncognito ? "Private chat" : chatId}\nReply: ${id}\n\n${replyText(message)}`, priority: "normal", status: "open" });
+    if (error) throw new Error("Couldn't report this reply. Please try again.");
+  };
   const { tasks: bgTasks, activeTasks, dispatch: dispatchBgTask } = useBackgroundTasks(chatId);
   const { user } = useAuth();
   const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set());
@@ -270,7 +293,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
       // While running: the work-state line only — no intro sentence, no card.
       const content = !isTerminal(job.status) ? "" : job.status === "failed" || job.status === "timed_out" ? `That didn't work: ${job.error ?? "unknown error"}` : job.status === "cancelled" ? "Task cancelled." : hasDeliveredFile(job) ? done : "";
       const msg: ChatMessageType = { id: msgId, role: "assistant", content, timestamp: new Date(), job };
-      return prev.some((m) => m.id === msgId) ? prev.map((m) => (m.id === msgId ? msg : m)) : [...prev, msg];
+      return prev.some((m) => m.id === msgId) ? prev.map((m) => (m.id === msgId ? { ...msg, deleted: m.deleted } : m)) : [...prev, msg];
     });
     try { const finalJob = await runJob(type, files ? { files, prompt: String(input.prompt ?? ""), sessionId } : { input, sessionId }, show, jobId); trackJob(jobId, !isTerminal(finalJob.status)); }
     catch (e: any) { trackJob(jobId, false); setMessages((prev) => [...prev.filter((m) => m.id !== msgId), { id: msgId, role: "assistant", content: `Sorry, that task couldn't start: ${e.message}`, timestamp: new Date() }]); }
@@ -699,11 +722,15 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
 
         {hasMessages ? (
           <div className="py-3">
-            {messages.map((msg) => (
+            {messages.filter((msg) => !msg.deleted).map((msg) => (
               <ChatMessage
                 key={msg.id}
                 message={msg}
                 isNew={newMessageIds.has(msg.id)}
+                fallbackSeconds={Math.max(0, (new Date(msg.timestamp).getTime() - new Date(messages.slice(0, messages.indexOf(msg)).findLast((m) => m.role === "user")?.timestamp ?? msg.timestamp).getTime()) / 1000)}
+                onDelete={handleDeleteReply}
+                onBranch={handleBranchReply}
+                onReport={isIncognito ? undefined : handleReportReply}
               />
             ))}
             {jobRestoreError && <div role="alert" className="mx-auto flex max-w-2xl flex-wrap items-center gap-2 px-3 py-3 text-sm text-muted-foreground"><span>Couldn't load saved results.</span><Button variant="secondary" size="sm" onClick={() => setJobRestoreAttempt((n) => n + 1)}>Try again</Button></div>}

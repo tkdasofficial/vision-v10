@@ -7,9 +7,26 @@ vi.mock("@/lib/cloud/client", () => ({ supabase: { from: (table: string) => ({
   select: () => ({ order: () => ({ limit: async () => ({ data: [], error: null }) }) }),
   insert: () => new Promise((resolve) => { db.release = () => { db.events.push("session-saved"); resolve({ error: null }); }; }),
   upsert: async (rows: any[]) => { db.events.push(`${table}:${rows[0].content}`); return { error: null }; },
+  update: () => ({ eq: async () => ({ error: null }) }),
 }) } }));
 import { ChatHistoryProvider, useChatHistory } from "@/context/ChatHistoryContext";
 describe("durable question before background dispatch", () => {
+  it("an immediate deletion clears the older queued answer so reload cannot restore it", async () => {
+    vi.useFakeTimers();
+    db.events.length = 0;
+    let api: ReturnType<typeof useChatHistory> | undefined;
+    function Probe() { api = useChatHistory(); return null; }
+    render(<ChatHistoryProvider><Probe /></ChatHistoryProvider>);
+    await act(async () => {});
+    if (!api) throw new Error("Missing context");
+    const current = api;
+    const reply = { id: "reply", role: "assistant" as const, content: "Old answer", timestamp: new Date() };
+    await act(async () => { current.updateChatMessages("existing", [reply]); });
+    await act(async () => { await current.persistChatMessages("existing", [{ ...reply, content: "", deleted: true }]); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(db.events).toEqual(["chat_messages:"]);
+    vi.useRealTimers();
+  });
   it("waits for the account session and question to be saved before work can start", async () => {
     db.events.length = 0;
     let api: ReturnType<typeof useChatHistory> | undefined;

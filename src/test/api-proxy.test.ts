@@ -1,7 +1,7 @@
 // Verifies the off-Worker API proxy: on the Worker requests stay local; off-Worker with
 // API_ORIGIN they are forwarded to the Cloudflare Worker (cookie preserved, origin
 // rewritten, response streamed back); without API_ORIGIN nothing is proxied.
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { maybeProxyToWorker, isWorkerRuntime, getApiOrigin } from "@/lib/cloud/api-proxy.server";
 import { captureWorkerEnv } from "@/lib/ai/runtime-env.server";
 
@@ -23,6 +23,7 @@ describe("api-proxy", () => {
   });
   afterEach(() => {
     (globalThis as any)[ENV_KEY] = undefined;
+    vi.unstubAllEnvs();
     if (savedEnv === undefined) delete process.env.API_ORIGIN;
     else process.env.API_ORIGIN = savedEnv;
   });
@@ -40,12 +41,19 @@ describe("api-proxy", () => {
 
   it("fails with a clear 503 when API_ORIGIN is not set (never runs API calls locally off-Worker)", async () => {
     delete process.env.API_ORIGIN;
-    expect(getApiOrigin()).toBeUndefined();
+    vi.stubEnv("DEV", false);
+    expect(getApiOrigin(false)).toBeUndefined();
     const res = await maybeProxyToWorker(req("/api/chat", { method: "POST", body: "{}" }));
     expect(res).not.toBeNull();
     expect(res!.status).toBe(503);
     const body = await res!.json();
     expect(body.error).toMatch(/not configured/i);
+  });
+
+  it("restores the existing development backend when the dev server's process variable is missing", () => {
+    delete process.env.API_ORIGIN;
+    expect(getApiOrigin(true)).toBe("https://vision.tusharkantidasofficial.workers.dev");
+    expect(getApiOrigin(false)).toBeUndefined();
   });
 
   it("forwards off-Worker requests to the Worker with cookie and rewritten origin", async () => {

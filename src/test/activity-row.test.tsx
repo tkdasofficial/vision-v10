@@ -18,9 +18,9 @@ describe("activity row", () => {
     expect(screen.getByText("Searching")).toBeTruthy();
     expect(screen.getByText("Writing")).toBeTruthy();
   });
-  it("renders no row without an activity record", () => {
-    render(<ChatMessage message={base} />);
-    expect(screen.queryByText(/Worked for/)).toBeNull();
+  it("uses the saved question-to-reply duration for older replies without activity", () => {
+    render(<ChatMessage message={base} fallbackSeconds={7} />);
+    expect(screen.getByText("Worked for 7s")).toBeTruthy();
   });
   it("sits above the reply text, not below it", () => {
     const { container } = render(<ChatMessage message={{ ...base, activity: { seconds: 12, steps: ["Thinking"] } }} />);

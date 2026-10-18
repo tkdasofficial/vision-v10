@@ -6,10 +6,11 @@
 // (DB/AI binding present) or without API_ORIGIN, requests are handled locally.
 
 import { getD1Binding, getAiBinding, getSecret } from "@/lib/ai/runtime-env.server";
+import { DEVELOPMENT_API_ORIGIN } from "@/lib/backend-config";
 
 /** The Cloudflare Worker's public origin, when configured. */
-export function getApiOrigin(): string | undefined {
-  const raw = getSecret("API_ORIGIN");
+export function getApiOrigin(development = import.meta.env.DEV): string | undefined {
+  const raw = getSecret("API_ORIGIN") || (development ? DEVELOPMENT_API_ORIGIN : undefined);
   if (!raw) return undefined;
   try {
     const url = new URL(raw);

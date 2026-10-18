@@ -107,6 +107,9 @@ export function buildMetadata(msg: ChatMessage): Record<string, any> {
   if (msg.pasted?.length) meta.pasted = msg.pasted;
   if (msg.typed !== undefined) meta.typed = msg.typed;
   if (msg.attachments?.length) meta.attachments = msg.attachments;
+  if (msg.deleted) meta.deleted = true;
+  if (msg.job && (msg.deleted || msg.archivedJob)) meta.job = msg.job;
+  if (msg.archivedJob) meta.archivedJob = true;
   return meta;
 }
 
@@ -128,6 +131,9 @@ function rowToMessage(row: any): ChatMessage {
     pasted: meta.pasted,
     typed: meta.typed,
     attachments: meta.attachments,
+    deleted: meta.deleted === true,
+    archivedJob: meta.archivedJob === true,
+    job: meta.job,
   };
 }
 
@@ -141,6 +147,7 @@ export function rowsToConversation(rows: any[]): ChatMessage[] {
   const msgs = sorted.map((x) => rowToMessage(x.r));
   const seen = new Set<string>();
   return msgs.filter((m, i) => {
+    if (m.deleted || m.archivedJob) return true;
     const key = `${m.role}\u0000${m.content}\u0000${m.imageUrl ?? ""}`;
     const dup = seen.has(key);
     seen.add(key);
@@ -336,8 +343,11 @@ export const ChatHistoryProvider = ({ children }: { children: ReactNode }) => {
   const persistChatMessages = useCallback(async (id: string, messages: ChatMessage[]) => {
     await sessionWrites.current.get(id);
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const pending = messages.filter((m) => m.content && !m.job && savedRef.current.get(m.id) !== m.content);
+    const pending = messages.filter((m) => (m.content || m.deleted) && (!m.job || m.deleted || m.archivedJob) && savedRef.current.get(m.id) !== JSON.stringify([m.content, buildMetadata(m)]));
     if (!pending.length) return;
+    // An older debounced snapshot must not overwrite an immediate edit/tombstone.
+    clearTimeout(saveTimers.current[id]);
+    pendingRows.current[id]?.clear();
     let last = 0;
     const rows = pending.map((m) => {
       last = Math.max(last + 1, new Date(m.timestamp).getTime() || Date.now());
@@ -346,8 +356,9 @@ export const ChatHistoryProvider = ({ children }: { children: ReactNode }) => {
     });
     const { error } = await supabase.from("chat_messages").upsert(rows, { onConflict: "id" });
     if (error) throw new Error("Couldn't save your message. Please try again.");
-    pending.forEach((m) => savedRef.current.set(m.id, m.content));
-    lsSetMessages(id, messages.filter((m) => !m.job));
+    pending.forEach((m) => savedRef.current.set(m.id, JSON.stringify([m.content, buildMetadata(m)])));
+    setHistory((prev) => prev.map((c) => c.id === id ? { ...c, messages } : c));
+    lsSetMessages(id, messages.filter((m) => !m.job || m.deleted || m.archivedJob));
   }, []);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const pendingRows = useRef<Record<string, Map<string, { row: any; msg: ChatMessage }>>>({});
@@ -356,12 +367,12 @@ export const ChatHistoryProvider = ({ children }: { children: ReactNode }) => {
     // Debounced save of messages that are new or changed since the last save.
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     // Cache with the database ids so a reload re-saves the same rows instead of creating duplicates.
-    lsSetMessages(id, messages.filter((m) => !m.job).map((m) => {
+    lsSetMessages(id, messages.filter((m) => !m.job || m.deleted || m.archivedJob).map((m) => {
       if (UUID.test(m.id)) return m;
       return { ...m, id: stableRowId(id, m.id) };
     }));
     // Task messages are restored from the server's task records, so they are not saved as chat rows.
-    const pending = messages.filter((m) => m.content && !m.job && savedRef.current.get(m.id) !== m.content);
+    const pending = messages.filter((m) => (m.content || m.deleted) && (!m.job || m.deleted || m.archivedJob) && savedRef.current.get(m.id) !== JSON.stringify([m.content, buildMetadata(m)]));
     if (pending.length === 0) return;
     // Each row carries its own strictly increasing time so the question always sorts before its answer
     // (rows saved in one batch used to share the server's "now").
@@ -393,7 +404,7 @@ export const ChatHistoryProvider = ({ children }: { children: ReactNode }) => {
       queue.clear();
       const allRows = batch.map((b) => b.row);
       const allMsgs = batch.map((b) => b.msg);
-      allMsgs.forEach((m) => savedRef.current.set(m.id, m.content));
+      allMsgs.forEach((m) => savedRef.current.set(m.id, JSON.stringify([m.content, buildMetadata(m)])));
     supabase
       .from("chat_messages")
       .upsert(allRows, { onConflict: "id" })
