@@ -38,7 +38,7 @@ const WORD_NUM: Record<string, number> = {
   two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
   one: 1, eleven: 11, twelve: 12, fifteen: 15, twenty: 20,
 };
-const NOUNS = "scenes?|prompts?|items?|steps?|ideas?|examples?|points?|sections?|questions?|tips?|reasons?|files?|options?|names?|titles?|slides?|shots?|chapters?|paragraphs?|bullets?|recommendations?|findings?";
+const NOUNS = "scenes?|prompts?|items?|steps?|ideas?|examples?|points?|sections?|questions?|tips?|reasons?|files?|options?|names?|titles?|slides?|shots?|chapters?|panels?|episodes?|beats?|paragraphs?|bullets?|recommendations?|findings?";
 const COUNT_RE = new RegExp(`\\b(\\d{1,4}|${Object.keys(WORD_NUM).join("|")})(?:\\s+|-)(?:[a-z-]+\\s+){0,2}?(${NOUNS})\\b`, "i");
 
 export function singular(noun: string) {
@@ -57,7 +57,7 @@ function parseClock(v: string, unit?: string): number {
 }
 
 export function analyzeRequest(text: string): RequestAnalysis {
-  const t = text.slice(0, 20000);
+  const t = text;
   const m = COUNT_RE.exec(t);
   const count = m ? toNum(m[1]) : NaN;
   const items = Number.isFinite(count) && count >= 1 && count <= MAX_ITEMS ? { count, noun: singular(m![2]) } : null;

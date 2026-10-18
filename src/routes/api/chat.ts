@@ -38,9 +38,9 @@ export const Route = createFileRoute("/api/chat")({
         const messages = raw
           .map((m: any, i: number) => {
             const role: "user" | "assistant" = m.role === "assistant" ? "assistant" : "user";
-            if (typeof m.content === "string") return { role, content: m.content.slice(0, 20000) };
+            if (typeof m.content === "string") return { role, content: m.content };
             if (!Array.isArray(m.content)) return { role, content: "" };
-            const text = m.content.filter((p: any) => p.type === "text").map((p: any) => String(p.text ?? "")).join("\n").slice(0, 20000);
+            const text = m.content.filter((p: any) => p.type === "text").map((p: any) => String(p.text ?? "")).join("\n");
             const images = role === "user" && i === raw.length - 1
               ? m.content.filter((p: any) => p.type === "image_url" && typeof p.image_url?.url === "string").slice(0, 4)
               : [];
@@ -210,7 +210,7 @@ export const Route = createFileRoute("/api/chat")({
               onEvent: (event) => providerProgress?.(event.stage, event.model) });
             if (!result.ok) return result;
             usedModel = result.model.label;
-            return { ok: true as const, text: result.text, finishReason: result.finishReason };
+            return { ok: true as const, text: result.text, finishReason: result.finishReason, model: result.model.model, provider: result.model.provider };
           };
           const call = callWith(models);
           // Review still uses an independent model, but its provider priority remains sequential.
@@ -247,7 +247,16 @@ export const Route = createFileRoute("/api/chat")({
                   return;
                 }
                 progress("analyzing");
-                const res = await runDeepPipeline({ messages: fullMessages as any, analysis: deepAnalysis, call, fallbackCall: reviewCall, request: lastText, plan: deepAnalysis.complex || lastText.length > 400, review: true, progress });
+                const { storyAdapter, budgetStoryMessages } = await import("@/lib/ai/deep/story");
+                const { d1StoryStore } = await import("@/lib/ai/deep/story-store.server");
+                const adapter = storyAdapter(models[0]?.model ?? "unknown", models[0]?.provider ?? "unknown");
+                const storyCall = (order: typeof models) => async (msgs: import("@/lib/ai/deep/pipeline").ChatMsg[]) => {
+                  try {
+                    for (const model of order) budgetStoryMessages(msgs, storyAdapter(model.model, model.provider));
+                    return await callWith(order)(msgs);
+                  } catch (e) { return { ok: false as const, status: 413, reason: e instanceof Error ? e.message : "Required story context exceeds token budget" }; }
+                };
+                const res = await runDeepPipeline({ messages: fullMessages as any, analysis: deepAnalysis, call: /^(scene|chapter|shot|panel|episode|beat)s?$/i.test(deepAnalysis.items?.noun ?? "") ? storyCall(models) : call, fallbackCall: reviewCall, request: lastText, plan: deepAnalysis.complex || lastText.length > 400, review: true, progress, story: { requestId, adapter, store: d1StoryStore(caller.user.id), reviewCall: storyCall(models.map((m) => m.provider === "nvidia" ? { ...m, model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning" } : m)) } });
                 console.log("[chat:deep]", JSON.stringify({ user: caller.user.id, model: usedModel, ok: res.ok, stages: res.stages, corrections: res.ok ? res.corrections : 0, remaining: res.ok ? res.remaining.length : null, ms: Date.now() - t0 }));
                 if (res.ok) {
                   await saveReply(caller.user.id, chatId, requestId, res.text, { executionMode: task.executionMode });
@@ -256,7 +265,9 @@ export const Route = createFileRoute("/api/chat")({
                 } else if (res.status !== 499) {
                   outcome = { status: "failed", error: res.reason };
                   progress("failed", res.reason);
-                  put(sseChunk(res.status === 503 ? ALL_PROVIDERS_UNAVAILABLE : res.stages.includes("plan-failed") ? "Deep Thinking couldn't build a reliable story plan, so it stopped instead of writing an unplanned story. Please try again." : "Deep Thinking couldn't produce an answer right now — no result was generated. Please try again."));
+                  const errorText = res.stages.includes("validation-unresolved") ? `Story validation could not pass. No unverified story was approved.\n\n${res.reason}` : res.status === 503 ? ALL_PROVIDERS_UNAVAILABLE : res.stages.includes("plan-failed") ? "Deep Thinking couldn't build a reliable story plan, so it stopped instead of writing an unplanned story. Please try again." : "Deep Thinking couldn't produce an answer right now — no result was generated. Please try again.";
+                  await saveReply(caller.user.id, chatId, requestId, errorText, { executionMode: task.executionMode, deep: { stage: "failed", seconds: Math.max(0, Math.round((Date.now() - t0) / 1000)), detail: res.reason } });
+                  put(sseChunk(errorText));
                 } else outcome = { status: "cancelled" };
               } catch (e) {
                 console.error("[chat:deep]", { category: "internal_error" });

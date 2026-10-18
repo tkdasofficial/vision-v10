@@ -45,7 +45,8 @@ export function classifyTask(input: { text: string; mode: ChatMode; hasMedia: bo
   const wantsCode = CODE_ACTION.test(text) && !isQuestionAbout;
   const pastedCode = HAS_CODE.test(text);
   const wantsReport = RESEARCH_ACTION.test(text) && !isQuestionAbout;
-  const wantsDeep = DEEP_ACTION.test(text) || text.length > 1200;
+  const wantsStory = /\b(?:write|create|generate|make)\b/i.test(text) && /\b(?:\d+|two|three|four|five|six|seven|eight|nine|ten|twenty|fifty)\s+(?:[a-z-]+\s+){0,2}(?:scenes?|chapters?|shots?|panels?|episodes?|beats?)\b/i.test(text);
+  const wantsDeep = wantsStory || DEEP_ACTION.test(text) || text.length > 1200;
 
   let mode: ChatMode = input.mode;
   if (mode === "default") {
