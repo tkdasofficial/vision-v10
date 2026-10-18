@@ -266,7 +266,7 @@ export const Route = createFileRoute("/api/chat")({
                   outcome = { status: "failed", error: res.reason };
                   progress("failed", res.reason);
                   const errorText = res.stages.includes("validation-unresolved") ? `Story validation could not pass. No unverified story was approved.\n\n${res.reason}` : res.status === 503 ? ALL_PROVIDERS_UNAVAILABLE : res.stages.includes("plan-failed") ? "Deep Thinking couldn't build a reliable story plan, so it stopped instead of writing an unplanned story. Please try again." : "Deep Thinking couldn't produce an answer right now — no result was generated. Please try again.";
-                  await saveReply(caller.user.id, chatId, requestId, errorText, { executionMode: task.executionMode });
+                  await saveReply(caller.user.id, chatId, requestId, errorText, { executionMode: task.executionMode, deep: { stage: "failed", seconds: Math.max(0, Math.round((Date.now() - t0) / 1000)), detail: res.reason } });
                   put(sseChunk(errorText));
                 } else outcome = { status: "cancelled" };
               } catch (e) {

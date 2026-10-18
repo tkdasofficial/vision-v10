@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 import { buildMetadata, rowsToConversation } from "@/context/ChatHistoryContext";
 
 describe("activity record persistence", () => {
+  it("keeps failed task time and failed step after reload", () => {
+    const metadata = buildMetadata({ id: "failed", role: "assistant", content: "Stopped", timestamp: new Date(), deep: { stage: "failed", seconds: 23, detail: "Validating: missing canonical prop" } });
+    const [restored] = rowsToConversation([{ id: "failed", role: "assistant", content: "Stopped", created_at: new Date().toISOString(), metadata }]);
+    expect(restored.deep).toEqual({ stage: "failed", seconds: 23, detail: "Validating: missing canonical prop" });
+  });
   it("saves real seconds and steps into message metadata", () => {
     const meta = buildMetadata({ id: "1", role: "assistant", content: "Hi", timestamp: new Date(), activity: { seconds: 12, steps: ["Thinking", "Searching", "Writing"] } } as any);
     expect(meta.activity).toEqual({ seconds: 12, steps: ["Thinking", "Searching", "Writing"] });
