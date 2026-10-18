@@ -86,7 +86,9 @@ export async function maybeProxyToWorker(request: Request): Promise<Response | n
     const setCookies = upstream.headers.getSetCookie?.() ?? [];
     for (const cookie of setCookies) responseHeaders.append("set-cookie", cookie);
     const isStream = (upstream.headers.get("content-type") ?? "").includes("text/event-stream");
-    return new Response(isStream && upstream.body ? detachFromClient(upstream.body) : upstream.body, { status: upstream.status, statusText: upstream.statusText, headers: responseHeaders });
+    const { prepareKeepAlive } = await import("@/lib/jobs/chat-background.server");
+    const keepAlive = isStream ? await prepareKeepAlive() : undefined;
+    return new Response(isStream && upstream.body ? detachFromClient(upstream.body, keepAlive) : upstream.body, { status: upstream.status, statusText: upstream.statusText, headers: responseHeaders });
   } catch (e: any) {
     console.error("[api-proxy] worker unreachable", e?.message);
     return Response.json({ error: "The backend service is unreachable. Please try again shortly." }, { status: 502 });
@@ -98,12 +100,12 @@ export async function maybeProxyToWorker(request: Request): Promise<Response | n
  * disconnects (reload, closed tab). The Worker therefore never sees a disconnect, finishes the
  * generation and saves it; the reloaded page reconnects through /api/chat-status.
  */
-export function detachFromClient(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+export function detachFromClient(body: ReadableStream<Uint8Array>, keepAlive?: (promise: Promise<unknown>) => void): ReadableStream<Uint8Array> {
   const reader = body.getReader();
   let clientGone = false;
   return new ReadableStream<Uint8Array>({
     start(ctrl) {
-      void (async () => {
+      const drain = (async () => {
         try {
           for (;;) {
             const { done, value } = await reader.read();
@@ -115,6 +117,7 @@ export function detachFromClient(body: ReadableStream<Uint8Array>): ReadableStre
           if (!clientGone) { try { ctrl.error(e); } catch { /* closed */ } }
         }
       })();
+      keepAlive?.(drain);
     },
     cancel() { clientGone = true; /* keep draining upstream */ },
   });

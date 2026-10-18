@@ -26,7 +26,8 @@ export const Route = createFileRoute("/api/chat")({
 
         // Work is detached from the browser connection so leaving/reloading never cancels it.
         const workSignal = new AbortController().signal;
-        const { keepAlive, saveReply } = await import("@/lib/jobs/chat-background.server");
+        const { prepareKeepAlive, saveReply } = await import("@/lib/jobs/chat-background.server");
+        const keepAlive = await prepareKeepAlive();
         const body: any = await request.json().catch(() => null);
         const chatId = typeof body?.conversationId === "string" ? body.conversationId.slice(0, 64) : undefined;
         const { loadConversationHistory } = await import("@/lib/ai/memory.server");
@@ -279,7 +280,7 @@ export const Route = createFileRoute("/api/chat")({
                 clearInterval(ping);
                 try { ctrl.enqueue(sseDone()); ctrl.close(); } catch { /* closed */ }
               }
-            })(); keepAlive(run); return run;
+            })(); keepAlive(run);
             },
           });
           return new Response(stream, {
@@ -412,7 +413,7 @@ export const Route = createFileRoute("/api/chat")({
               clearInterval(ping);
               try { ctrl.enqueue(sseComment("end")); ctrl.enqueue(sseDone()); ctrl.close(); } catch { /* closed */ }
             }
-          })(); keepAlive(run); return run;
+          })(); keepAlive(run);
           },
         });
         return new Response(stream, {

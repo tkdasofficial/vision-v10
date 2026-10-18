@@ -1,5 +1,8 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Background workers
+- [ ] Register background lifetime before starting chat, file and sandbox work; retain results and failures after disconnect; test leave/reopen flow without deployment.
+
 ## Current request — Diagnose unavailable AI providers
 - [x] Saved original failure is in story planning (413s). All three existing relays returned 4 with HTTP 200; Groq produced a 10-line planning outline in 3s. Found shared-deadline starvation; repaired fallback reservations and rejected expired partial streams without changing models, caps or total budget. 58 targeted regressions passed; automatic build OK; current-code real planning call succeeded in 31s.
 - [ ] Verify complete original story through the executing backend — blocked: preview proxies to unchanged Cloudflare code; retry 049b9ff3 showed Failed after 309s while its server record remained running/planning with no underlying error. No deployment authorized or performed; original full story not claimed complete.

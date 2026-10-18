@@ -1,11 +1,23 @@
 // Background completion for chat replies: the work keeps running after the browser leaves or reloads,
 // and the finished answer is written to the user's chat so it is there when they come back.
 
-/** Keeps the Worker alive until `p` settles, even if the client disconnected. No-op outside workerd. */
-export function keepAlive(p: Promise<unknown>) {
-  import(/* @vite-ignore */ "cloudflare:workers" as string)
-    .then((m: any) => { try { m.waitUntil?.(p); } catch { /* not in a request */ } })
-    .catch(() => { /* dev server: the process stays alive anyway */ });
+type Lifetime = (promise: Promise<unknown>) => void;
+/** Resolve the request-scoped runtime BEFORE starting work or returning a response. */
+export async function prepareKeepAlive(
+  load: () => Promise<{ waitUntil?: Lifetime }> = () => import(/* @vite-ignore */ "cloudflare:workers" as string),
+): Promise<Lifetime> {
+  try {
+    const runtime = await load();
+    if (typeof runtime.waitUntil !== "function") throw new Error("Background task lifetime is unavailable.");
+    const waitUntil = runtime.waitUntil;
+    return (promise) => waitUntil(promise);
+  } catch (error) {
+    const { getD1Binding, getAiBinding } = await import("@/lib/ai/runtime-env.server");
+    // Fail before accepting work on a misconfigured Worker; local development has
+    // no request lifetime limit and may keep draining the existing remote service.
+    if (getD1Binding() || getAiBinding()) throw error;
+    return () => {};
+  }
 }
 
 /**
@@ -23,5 +35,6 @@ export async function saveReply(userId: string, chatId: string | undefined, repl
     await d1("UPDATE chat_sessions SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND user_id = ?", [chatId, userId]);
   } catch (e) {
     console.error("[chat:background] save failed", (e as Error)?.message);
+    throw new Error("The reply could not be saved. Please reopen the chat to check its task status.");
   }
 }
