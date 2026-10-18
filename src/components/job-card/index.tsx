@@ -60,7 +60,7 @@ export default function JobCard({ job: given, onRetry, compact }: { job: JobView
     void followJob(given.id, fetchJob, (j) => setJob((cur) => ((!isTerminal(cur.status) || isTerminal(j.status)) && Date.parse(j.updatedAt) >= Date.parse(cur.updatedAt) ? j : cur)), () => stop);
     return () => { stop = true; };
   }, [given.id]);
-  const [open, setOpen] = useState(!compact);
+  const [open, setOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const retry = async () => {
@@ -100,21 +100,14 @@ export default function JobCard({ job: given, onRetry, compact }: { job: JobView
   // While working: the work-state line only — no card, no icons.
   if (running) return statusLine;
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 text-card-foreground">
-      <div className="flex items-start gap-3">
-        <StatusIcon status={job.status} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold">{TITLES[job.type]}{r.name ? ` · ${r.name}` : r.fileName ? ` · ${r.fileName}` : ""}</span>
-            <Badge variant={job.status === "failed" || job.status === "timed_out" ? "destructive" : "secondary"} className="rounded-full">{JOB_STATUSES[visible.status]}</Badge>
-          </div>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground" aria-live="polite">{visible.detail}</p>
-          {job.progress != null && running && <div className="mt-2 h-1 overflow-hidden rounded bg-muted"><div className="h-full bg-primary" style={{ width: `${Math.round(job.progress * 100)}%` }} /></div>}
-        </div>
+    <div className="space-y-2 text-foreground">
+      <div className="flex flex-wrap items-center gap-1">
+        <Button variant="ghost" className="h-auto min-w-0 gap-1 px-0 py-0 text-left" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Show task details">
+          {statusLine}<ChevronDown className={cn("h-3 w-3 shrink-0 transition-transform", open && "rotate-180")} />
+        </Button>
         <div className="flex shrink-0 gap-1">
           {running && <Button size="sm" variant="ghost" disabled={cancelling} onClick={async () => { setCancelling(true); await cancelJob(job.id).catch(() => setCancelling(false)); }} aria-label="Cancel task"><Square className="h-3.5 w-3.5" /></Button>}
           {(job.status === "failed" || job.status === "cancelled" || job.status === "timed_out") && <Button size="sm" variant="ghost" disabled={retrying} onClick={retry} aria-label="Retry task"><RotateCcw className="h-3.5 w-3.5" /></Button>}
-          <Button size="sm" variant="ghost" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Show details"><ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} /></Button>
         </div>
       </div>
 
@@ -157,6 +150,7 @@ export default function JobCard({ job: given, onRetry, compact }: { job: JobView
 
       {open && (
         <div className="mt-3 space-y-3 border-t border-border pt-3 text-sm">
+          {(job.status === "failed" || job.status === "timed_out") && <div className="space-y-1 text-xs"><p className="font-medium">Failed step: {JOB_STATUSES[visible.steps.findLast((s) => s.outcome === "error" && !isTerminal(s.status))?.status ?? visible.steps.findLast((s) => !isTerminal(s.status))?.status ?? "processing"]}</p><p className="break-words text-destructive">{job.error || visible.detail || "The task ended without a recorded cause."}</p></div>}
           <ol className="space-y-1">
             {visible.steps.map((s, i) => (
               <li key={i} className="flex items-start gap-2 text-xs">

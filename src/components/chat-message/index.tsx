@@ -11,6 +11,7 @@ import FileConverterCard from "@/components/file-converter-card";
 import FileCreatorCard from "@/components/file-creator-card";
 import UserMessage from "@/components/chat/user-message";
 import DocumentCard from "@/components/chat/document-card";
+import { Button } from "@/components/ui/button";
 
 type Props = { message: ChatMessageType; isNew?: boolean };
 
@@ -425,25 +426,21 @@ const ActionButton = ({
 /* ── Deep Thinking Mode reply ──
    "Working on it" note → slim full-width status card (live stage + timer) → big title + structured answer. */
 const DEEP_LABELS: Record<DeepStage, string> = {
-  thinking: "Thinking", analyzing: "Analyzing your request", researching: "Researching", working: "Working on it",
-  crafting: "Preparing final response", done: "Done", failed: "Couldn't finish",
-  planning: "Preparing execution plan", generating: "Generating individual tasks", verifying: "Verifying results",
-  correcting: "Correcting identified issues", validating: "Running final validation",
-  retrying: "Retrying", switching_provider: "Working on it",
+  thinking: "Thinking", analyzing: "Analyzing", researching: "Searching", working: "Working",
+  crafting: "Finalizing", done: "Done", failed: "Failed",
+  planning: "Planning", generating: "Writing", verifying: "Validating",
+  correcting: "Fixing", validating: "Validating",
+  retrying: "Retrying", switching_provider: "Working",
 };
 
 const DeepStatusCard = ({ stage, seconds, detail }: { stage: DeepStage; seconds?: number; detail?: string }) => {
+  const [open, setOpen] = useState(false);
   const live = stage !== "done" && stage !== "failed";
   // Elapsed time is never shown while working — only the "thought for Ns" note once done.
   const secs = live ? undefined : seconds;
   return (
-    <div role="status" aria-live="polite" className="flex h-16 w-full items-center gap-2 rounded-lg border border-border bg-muted/60 px-3 text-xs">
-      {live ? <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
-        : stage === "done" ? <Check className="size-3.5 shrink-0 text-primary" />
-        : <AlertCircle className="size-3.5 shrink-0 text-destructive" />}
-      <span key={stage} className="min-w-0 break-words font-medium text-foreground animate-fade-in">
-        {DEEP_LABELS[stage]}{live && detail && stage !== "switching_provider" ? ` · ${detail}` : ""}{live ? "…" : stage === "done" && secs ? ` · thought for ${secs}s` : ""}
-      </span>
+    <div className="py-1 text-sm">
+      {stage === "failed" ? <><Button variant="ghost" className="h-auto gap-1 px-0 py-0 font-medium" onClick={() => setOpen((v) => !v)} aria-expanded={open}>Failed after {Math.max(0, Math.round(seconds ?? 0))}s<ChevronRight className={cn("size-3", open && "rotate-90")} /></Button>{open && <p className="mt-2 break-words text-xs text-destructive">{detail || "The task ended without a recorded failed step."}</p>}</> : <span role="status" aria-live="polite" key={stage} className="font-medium text-foreground animate-fade-in">{DEEP_LABELS[stage]}{live ? "…" : secs != null ? ` · ${secs}s` : ""}</span>}
     </div>
   );
 };
@@ -475,9 +472,6 @@ const DeepReplyContent = ({ message, deep }: { message: ChatMessageType; deep: N
   const { title, body } = useMemo(() => splitDeepTitle(message.content || ""), [message.content]);
   return (
     <div className="w-full space-y-3">
-      <p className="text-sm text-muted-foreground">
-        {done ? "Here's what I worked out." : stage === "failed" ? "I couldn't finish this one." : "I'm working on it — thinking it through and checking the result before I answer."}
-      </p>
       <DeepStatusCard stage={stage} seconds={deep.seconds} detail={deep.detail} />
       {(done || stage === "failed") && message.content && (
         <article className="animate-fade-in pt-2">
