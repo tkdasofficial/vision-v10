@@ -1,14 +1,15 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
 ## Current request — Backend connection and saved-results error handling
-- [ ] Verify active Cloudflare deployment, bindings and preview-to-backend connection without changing hosting or data.
-- [ ] Diagnose and repair saved-results loading and misleading connection errors; add focused regression tests.
-- [ ] Verify signed-in saved results, download and reload; report exact checks and remaining limitations.
+- [x] Active Cloudflare version b2d22d24-bd01-4f39-857d-69bb82b1c87c receives 100% traffic (deployed 2026-10-18 05:45:38 UTC). DB/SANDBOX_DB/AI/ASSETS/SMTP bindings, preview origins and required table names verified read-only; no deployment/resource/secret changes this turn.
+- [x] Reproduced authenticated HTTP 200 /api/jobs failing with double Brotli decompression. Proxy requests identity encoding and removes decoded encoding headers for JSON/SSE/downloads. Saved-result errors preserve safe server reasons; malformed responses fail explicitly; accepted start/retry polling retains state across transient errors. Six new regressions; full suite 1,475 passed/one skipped; automatic build OK.
+- [x] Signed-in jobs/status reads return 200; saved workbook downloads and persists on reload (valid XLSX ZIP, five sheets, 500 sales rows, three charts). Simulated 503 → visible reason/Retry → successful restore. Real calculation 323 saved after reload; closing before a 12-tip answer completed restores Worked for 19s. Exact preview URL unchanged.
+- [x] Scope limits: no fresh large story/workbook generation, SMTP delivery, social OAuth, new Drive upload or GitHub dispatch tested. Credential presence is not validity; GITHUB_PAT absent from Worker secret-name listing (runtime configuration unverified). Existing 7-day artifacts, 30-job cap and host lifetime limits remain; no claim every feature is verified.
 
 ## Current request — Background workers
 - [x] Chat, files and sandbox resolve runtime lifetime before starting work, then register synchronously; SSE start no longer waits for completion before delivering status. Proxy drain is also registered. Missing Worker lifetime fails before acceptance; reply storage failure cannot count as completed; normal/deep error replies persist when storage is available.
 - [x] Signed-in task ab607098-01f6-4367-afb2-4f5ed327f545 started, page closed before completion, reopened and reloaded: complete 12-item answer restored with Worked for 63s. 61 targeted tests and full suite 1,470 passed/one skipped; automatic build OK. Preview URL unchanged; no deployment.
-- [ ] Verify new backend lifetime changes on executing Cloudflare version — blocked by no-deployment scope. Current preview proxy improvement is exercised; backend changes are source-only. Worker lifetime limits still apply; unlimited/very-long completion is not guaranteed by waitUntil.
+- [x] Latest authorized deployment b2d22d24 confirmed active; real task closed before completion and restored after reopening with Worked for 19s on 2026-10-18. Worker lifetime limits still apply; unlimited/very-long completion is not guaranteed by waitUntil.
 
 ## Current request — Diagnose unavailable AI providers
 - [x] Saved original failure is in story planning (413s). All three existing relays returned 4 with HTTP 200; Groq produced a 10-line planning outline in 3s. Found shared-deadline starvation; repaired fallback reservations and rejected expired partial streams without changing models, caps or total budget. 58 targeted regressions passed; automatic build OK; current-code real planning call succeeded in 31s.
