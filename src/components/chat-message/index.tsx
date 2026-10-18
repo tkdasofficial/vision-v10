@@ -318,7 +318,7 @@ const ChatMessage = forwardRef<HTMLDivElement, Props>(({ message, isNew = false 
         <div className="group relative w-full">
           <div className="space-y-3">
             {/* Finished-task summary ("Worked for Ns") sits above the results, expandable to the real steps. */}
-            {message.activity && typingDone && <ActivityRow activity={message.activity} />}
+            {message.activity && typingDone && message.deep?.stage !== "failed" && <ActivityRow activity={message.activity} />}
             {message.imageUrl && (
               <img
                 src={message.imageUrl}

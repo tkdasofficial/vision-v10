@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { encode } from "gpt-tokenizer";
+import { encode } from "gpt-tokenizer/encoding/o200k_harmony";
 import type { ChatMsg } from "./pipeline";
 
 const id = z.string().min(1);
@@ -330,7 +330,7 @@ export function storyAdapter(model: string, provider: string): StoryAdapter {
     headroomTokens: 2048,
     schemaMode: "normalized-json",
     tokenization: gpt
-      ? "o200k BPE estimate (not provider usage)"
+      ? "o200k_harmony BPE estimate (not provider usage)"
       : "UTF-8 byte upper bound; native tokenizer unavailable",
     countTokens: gpt ? (s) => encode(s).length : (s) => new TextEncoder().encode(s).length,
   };
