@@ -1,10 +1,10 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
 ## Current request — Every reply status and actions
-- [ ] Diagnose and fix “Couldn't load saved results” in the existing signed-in preview.
-- [ ] Keep one status at the top of every AI reply, including saved/file/failed responses.
-- [ ] Add Copy, Speak, Share and a menu with Report, Delete Message and Create Branch; preserve saved history and incognito privacy.
-- [ ] Verify signed-in actions, reload persistence and compact phone layout without deployment.
+- [x] Fixed saved-results 503: development API proxy now resolves the existing public Worker address even after its process variable disappears; non-dev hosts retain the explicit API_ORIGIN requirement. Signed-in jobs read returned 200 and actual saved XLSX downloaded (valid ZIP, five sheets).
+- [x] Status stays above normal/saved/file/failed responses; older messages use stored question/reply timestamps when no activity exists. Copy, Speak, Share and three-dot Report/Delete Message/Create Branch appear below every response.
+- [x] Signed-in copy/share fallback, speech dispatch, saved report, file branch/reload and deletion/reload verified; original file remains intact. Immediate edits cancel queued old saves to prevent restored deletions. Incognito branches/deletes remain in memory and reports are disabled.
+- [x] Phone 360×581 and desktop inspected; no page errors, unchanged preview, no deployment. Full suite 1,464 passed/one skipped before final save-race regression; subsequent 25 targeted tests passed including the added regression; automatic build OK. Full lint remains blocked by 10,374 existing repository-wide errors (mostly formatting); no unrelated cleanup. AI Elements message actions installed; MessageResponse trial broke source-aware table children/currency tests, so MarkdownReply retains its narrowly documented renderer exception.
 
 ## Current request — Consistent terminal status position
 - [x] Shared compact terminal status across normal/private replies, Deep and completed file jobs; real elapsed time persists even without stage history. Immediate reply save prevents reload dropping duration. Signed-in normal task returned 42 and Worked for 2s, retained after immediate reload; Deep restored Worked for 96s exactly once; failed workbook expanded Failed after 210s → Generating; saved workbook shows one success summary and download. Phone 360×581 inspected with no overflow. Full suite: 1,460 passed, one skipped; automatic build OK. No backend deployment.
