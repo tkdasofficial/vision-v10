@@ -1,5 +1,8 @@
 # Roadmap — Memory, Output Control, Artifacts & Activity Tracking
 
+## Current request — Diagnose unavailable AI providers
+- [ ] Verify failed story planning; reserve fallback time without changing models or total budget; test without deployment.
+
 ## Current request — Every reply status and actions
 - [x] Fixed saved-results 503: development API proxy now resolves the existing public Worker address even after its process variable disappears; non-dev hosts retain the explicit API_ORIGIN requirement. Signed-in jobs read returned 200 and actual saved XLSX downloaded (valid ZIP, five sheets).
 - [x] Status stays above normal/saved/file/failed responses; older messages use stored question/reply timestamps when no activity exists. Copy, Speak, Share and three-dot Report/Delete Message/Create Branch appear below every response.
